@@ -702,6 +702,33 @@ function lrIn(r){var me=myNick();return r.owner===me||r.members.indexOf(me)>-1}
 function enterLR(id){var r=lrs()[id];if(!r)return;$('drawer').classList.remove('open');openConv('lr:'+id,'🔐 '+r.name)}
 function ccSearchBox(){return '<div class="sec">🔎 '+esc(fl(_tx('بحث'),'Search'))+'</div><input class="f" id="ccQ" maxlength="60" placeholder="'+esc(fl(_tx('ابحث عن شخص، صالون، متجر، منتج، روضة...'),'Search people, salons, shops, products, nurseries...'))+'"><div id="ccQRes"></div>';}
 function ccTopSearch(q){openSheet('<b>🔎 '+esc(q)+'</b><div id="ccTopRes" style="max-height:70vh;overflow:auto"></div>');ccSearchRun(q,$('ccTopRes'))}
+function ccOrganizeDrawer(){
+  var d=document.getElementById('drawer');if(!d)return;
+  var kids=Array.prototype.slice.call(d.children);
+  var searchNodes=[],rooms=[],chans=[],buy=null,firstQ=null;
+  kids.forEach(function(el){
+    if(el.id==='ccQ'){ if(!firstQ){firstQ=el;} else { var p=el.previousElementSibling; if(p&&p.classList.contains('sec'))p.remove(); var q=el.nextElementSibling; if(q&&q.id==='ccQRes')q.remove(); el.remove(); } }
+  });
+  kids=Array.prototype.slice.call(d.children);
+  kids.forEach(function(el){
+    if(!el.parentNode)return;
+    if(el.id==='ccQ'){var pr=el.previousElementSibling;if(pr&&pr.classList.contains('sec'))searchNodes.push(pr);searchNodes.push(el);var nx=el.nextElementSibling;if(nx&&nx.id==='ccQRes')searchNodes.push(nx);return}
+    if(el.id==='ccQRes')return;
+    if(el.classList.contains('sec'))return;
+    if(el.id==='bbNew'||el.id==='newChan'||(el.textContent||'').indexOf('شراء قناة')>-1){buy=el;return}
+    if(el.hasAttribute('data-r')||el.hasAttribute('data-lr')||el.id==='newLR'){rooms.push(el);return}
+    chans.push(el);
+  });
+  function wrap(nodes){var w=document.createElement('div');w.hidden=true;nodes.forEach(function(n){w.appendChild(n)});return w}
+  function btn(icon,label,target){var b=document.createElement('button');b.type='button';b.className='room';b.innerHTML='<i>'+icon+'</i><div><b>'+label+'</b></div>';b.onclick=function(){target.hidden=!target.hidden};return b}
+  var wS=wrap(searchNodes),wR=wrap(rooms),wC=wrap(chans);
+  d.innerHTML='';
+  d.appendChild(btn('🔎','بحث',wS));d.appendChild(wS);
+  d.appendChild(btn('🏠','الغرف',wR));d.appendChild(wR);
+  d.appendChild(btn('📣','القنوات',wC));d.appendChild(wC);
+  if(buy)d.appendChild(buy);
+  if(typeof ccSearchBind==='function')ccSearchBind();
+}
 function ccSearchBind(){var inp=document.getElementById('ccQ');if(!inp)return;var t=null;inp.oninput=function(){clearTimeout(t);t=setTimeout(ccSearchRun,350)}}
 async function ccSearchRun(qArg,boxArg){var q=(typeof qArg==='string'?qArg:(document.getElementById('ccQ')?document.getElementById('ccQ').value:'')||'').trim(),box=boxArg||document.getElementById('ccQRes');if(!box)return;
   if(q.length<2){box.innerHTML='';return}
@@ -721,7 +748,7 @@ function renderRooms(){renderRooms0();var d=$('drawer'),L=lrs(),h=ccSearchBox()+
   d.insertAdjacentHTML('beforeend',h);ccSearchBind();
   [].forEach.call(d.querySelectorAll('[data-lr]'),function(b){b.onclick=function(){enterLR(b.dataset.lr)}});
   if($('newLR'))$('newLR').onclick=openNewLR;
-  var g=$('codeGo');if(g){var og=g.onclick;g.onclick=function(){var v=($('codeIn').value||'').trim().toUpperCase(),L=lrs(),id=Object.keys(L).filter(function(i){return L[i].code===v})[0];if(id&&S.user)openLREntry(id);else og()}}}
+  var g=$('codeGo');if(g){var og=g.onclick;g.onclick=function(){var v=($('codeIn').value||'').trim().toUpperCase(),L=lrs(),id=Object.keys(L).filter(function(i){return L[i].code===v})[0];if(id&&S.user)openLREntry(id);else og()}}try{ccOrganizeDrawer()}catch(e){console.warn(e)}}
 function openLREntry(id){var r=lrs()[id];if(!r)return;if(lrIn(r))return enterLR(id);
   openSheet('<b>🔐 '+esc(r.name)+'</b><input class="f" id="lrIn" style="margin-top:10px;text-transform:uppercase" placeholder="'+x('lrEnter')+'"><button class="go" id="lrGo">'+t('enter')+'</button>');
   $('lrGo').onclick=function(){if(($('lrIn').value||'').trim().toUpperCase()!==r.code)return toast(t('badCode'));var L=lrs();L[id].members.push(myNick());jset('cc_lrooms',L);Net.send({id:uid(),room:'lr:'+id,type:'sys',text:'👋 '+myNick()+' — '+t('joined'),nick:myNick(),at:Date.now()});renderRooms();enterLR(id)}}
