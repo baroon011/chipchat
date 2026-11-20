@@ -3183,8 +3183,10 @@ function landing(code){if(standalone())return toLogin(code);var h=window.ccByCod
   $('jlIn').onclick=function(){if(DEF){DEF.prompt();DEF=null}else toast(fl(_tx('من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية»'),'From the browser menu choose “Add to Home Screen”'))}}
 function confirmJoin(id,inv){var c=chans()[id];openSheet('<b>🎟 '+fl(_tx('دعوة للانضمام'),'Invitation')+'</b><div style="margin:10px 0">'+esc(c.icon+' '+c.name)+'</div><button class="go" id="cjGo">'+fl(_tx('انضمام إلى القناة'),'Join the channel')+'</button>');$('cjGo').onclick=function(){useInvite(id,inv)}}
 function handle(code){code=String(code||'').toUpperCase();if(!code)return;if(S.user&&window.ccBBJoin&&window.ccBBJoin(code))return;if(S.user){var h=window.ccByCode(chans(),code);if(h&&h.err)return toast('⚠ '+h.err);if(h&&h.id){var c=chans()[h.id];if(!h.inv&&c&&c.kind==='commercial'&&!chBanned(c,me())&&c.owner!==me()&&c.members.indexOf(me())<0){if(c.locked)return toast('🔒 '+fl(_tx('القناة مقفلة حالياً'),'This channel is locked'));var CCm=chans();CCm[h.id].members.push(me());chSave(CCm);renderRooms();return enterChan(h.id)}return h.inv?confirmJoin(h.id,h.inv):(c.members.indexOf(me())>-1||c.owner===me()?enterChan(h.id):toast(t('badCode')))}return toast(t('badCode'))}landing(code)}
-function scanHash(){var m=/[#&?]join=([A-Za-z0-9]{4,12})/.exec(location.hash+location.search);if(!m)return;try{history.replaceState(null,'',location.href.split('#')[0])}catch(e){}setTimeout(function(){handle(m[1])},250)}
+function scanHash(){var m=/[#&?]join=([A-Za-z0-9]{4,12})/.exec(location.hash+location.search);if(!m)return;try{sessionStorage.setItem('cc_pj',m[1])}catch(e){}try{history.replaceState(null,'',location.href.split('#')[0])}catch(e){}setTimeout(function(){handle(m[1]);try{if(S.user)sessionStorage.removeItem('cc_pj')}catch(e){}},250)}
 window.addEventListener('hashchange',scanHash);scanHash();
+/* استكمال رابط الدعوة بعد تسجيل الدخول */
+setInterval(function(){var k=null;try{k=sessionStorage.getItem('cc_pj')}catch(e){}if(!k||!S.user)return;try{sessionStorage.removeItem('cc_pj')}catch(e){}handle(k)},1000);
 })();
 
 /* ===== الخطوة 10: وضع «القناة فقط» لأعضاء قنوات المؤسسات + زر العودة إلى نافذة الدخول ===== */
