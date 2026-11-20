@@ -701,8 +701,9 @@ function lrs(){return jget('cc_lrooms',{})}
 function lrIn(r){var me=myNick();return r.owner===me||r.members.indexOf(me)>-1}
 function enterLR(id){var r=lrs()[id];if(!r)return;$('drawer').classList.remove('open');openConv('lr:'+id,'🔐 '+r.name)}
 function ccSearchBox(){return '<div class="sec">🔎 '+esc(fl(_tx('بحث'),'Search'))+'</div><input class="f" id="ccQ" maxlength="60" placeholder="'+esc(fl(_tx('ابحث عن شخص، صالون، متجر، منتج، روضة...'),'Search people, salons, shops, products, nurseries...'))+'"><div id="ccQRes"></div>';}
+function ccTopSearch(q){openSheet('<b>🔎 '+esc(q)+'</b><div id="ccTopRes" style="max-height:70vh;overflow:auto"></div>');ccSearchRun(q,$('ccTopRes'))}
 function ccSearchBind(){var inp=document.getElementById('ccQ');if(!inp)return;var t=null;inp.oninput=function(){clearTimeout(t);t=setTimeout(ccSearchRun,350)}}
-async function ccSearchRun(){var q=(document.getElementById('ccQ').value||'').trim(),box=document.getElementById('ccQRes');if(!box)return;
+async function ccSearchRun(qArg,boxArg){var q=(typeof qArg==='string'?qArg:(document.getElementById('ccQ')?document.getElementById('ccQ').value:'')||'').trim(),box=boxArg||document.getElementById('ccQRes');if(!box)return;
   if(q.length<2){box.innerHTML='';return}
   var r;try{r=(await window.ccSb.rpc('search_everything',{p_q:q})).data||{}}catch(e){box.innerHTML='<div class="it soon">'+esc(fl(_tx('تعذر البحث الآن'),'Search unavailable'))+'</div>';return}
   var h='';
@@ -4251,7 +4252,7 @@ async function starsFollow(r){var x=await window.ccSb.rpc('stars_follow',{p_chan
 function srShow(q,rows){
   var lab={commercial:fl(_tx('🛍 قناة تجارية'),'🛍 Commercial channel'),owner:fl(_tx('أنت المالك'),'You own it'),member:fl(_tx('أنت عضو ✔'),'Member ✔'),pending:fl(_tx('⏳ طلبك قيد المراجعة'),'⏳ Request pending')};
   openSheet('<b>🔎 '+esc(q)+'</b>'+(rows.length?rows.map(function(r){return '<button class="room" data-sr="'+esc(r.id)+'"><i>'+esc(r.icon||'📣')+'</i><div><b>'+esc(r.name)+vmk(r.id)+'</b><small>'+(r.owner?esc(r.owner)+' • ':'')+(r.n!=null?r.n+' '+fl(_tx('متابع'),'followers')+' • ':'')+(lab[r.st]||fl(_tx('📣 قناة نشر'),'📣 Publishing'))+'</small></div><em>›</em></button>'}).join(''):'<div class="swN">'+fl(_tx('لا توجد قنوات نشر بهذا الاسم. قنوات المؤسسات الخاصة تُفتح بكود الدعوة فقط.'),'No publishing channels match. Private organization channels open with an invite code only.')+'</div>'));
-  bindAll('[data-sr]',function(b){var r=rows.filter(function(z){return z.id===b.dataset.sr})[0];if(!r)return;if(r._code){closeSheet();return guestEnter(r._code)}if(r._uid){closeSheet();return openProfileView(r._uid)}pubEntry(r)})}
+  bindAll('[data-sr]',function(b){var r=rows.filter(function(z){return z.id===b.dataset.sr})[0];if(!r)return;if(r._code){closeSheet();return guestEnter(r._code)}if(r._uid){closeSheet();return openProfileView(r._uid)}if(r.st==='commercial'){closeSheet();return window.ccSb.rpc('chan_share_code',{p_chan:r.id}).then(function(x){if(x.error||!x.data)return toast('⚠ '+String((x.error&&(x.error.message||x.error))||'no shop code').slice(0,140));guestEnter(x.data)})}pubEntry(r)})}
 async function nameSearch(q){
   if(q.length<2)return toast(fl(_tx('اكتب حرفين على الأقل'),'Type at least 2 characters'));
   var low=q.toLowerCase(),rows={},C=chans();
@@ -4273,7 +4274,7 @@ function wrapSearch(){
     var v=String(inp.value||'').trim();
     if(!v||!S.user)return og&&og.call(g);
     if(/^[A-Za-z0-9]{4,12}$/.test(v)){SQ={q:v,t:Date.now()};return og&&og.call(g)}
-    SQ=null;nameSearch(v)};
+    SQ=null;ccTopSearch(v)};
   inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();g.onclick()}}}
 var oRR2=window.renderRooms;
 window.renderRooms=function(){var r=oRR2.apply(this,arguments);try{wrapSearch()}catch(e){}return r};
@@ -19905,7 +19906,7 @@ var st=document.createElement('style');st.textContent=css.join('');document.head
       var i=b.querySelector('i'), sm=b.querySelector('small');
       if(i)i.textContent='💈'; if(sm)sm.textContent=_tx('قناة الحلاقين');
     });
-    if(S.user && !document.getElementById('bbNew')){
+    if(false && S.user && !document.getElementById('bbNew')){
       d.insertAdjacentHTML('beforeend',_tx('<button class="room" id="bbNew"><i>💈</i><div><b>قناة الحلاقين</b><small>حجز مواعيد لفروع صالونك</small></div></button>'));
       document.getElementById('bbNew').onclick=create;
     }
