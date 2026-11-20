@@ -4259,7 +4259,7 @@ async function nameSearch(q){
   if(S.user&&S.user.sv){
     var r=await sb.rpc('chan_search',{q:q});
     if(r.error){console.warn(r.error);srWarn(r.error)}
-    else(r.data||[]).forEach(function(x){var c=C[x.cid];rows[x.cid]=Object.assign(rows[x.cid]||{},{id:x.cid,name:x.cname,icon:x.cicon,owner:x.owner_nick,n:x.mcount,st:(x.ckind==='commercial')?'commercial':(c?chStatus(c):'none')})})}
+    else(r.data||[]).forEach(function(x){var c=C[x.cid];var dupe=Object.keys(rows).some(function(k){return k!==x.cid&&rows[k].name===x.cname&&rows[k].owner===x.owner_nick});if(dupe&&!rows[x.cid])return;rows[x.cid]=Object.assign(rows[x.cid]||{},{id:x.cid,name:x.cname,icon:x.cicon,owner:x.owner_nick,n:x.mcount,st:(x.ckind==='commercial')?'commercial':(c?chStatus(c):'none')})})}
   var stR=await window.ccSb.rpc('store_search',{p_q:q}).catch(function(){return {data:[]}});
   ((stR&&stR.data)||[]).forEach(function(x){rows['st:'+x.code]={id:'st:'+x.code,name:x.name,icon:'🛒',owner:'',n:'',st:'none',_code:x.code}});
   var peR=await window.ccSb.rpc('people_search',{p_q:q}).catch(function(){return {data:[]}});
