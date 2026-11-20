@@ -8558,7 +8558,8 @@ var cb=document.querySelector('#conv .bar');if(cb&&$('cTitle'))cb.insertBefore(q
 function chOf(){if(!CV||!CV.ch||!$('conv')||$('conv').hidden)return null;var c=chans()[CV.ch];if(!c||ctype(c)==='corp')return null;return (c.owner===S.user.nick||(c.members||[]).indexOf(S.user.nick)>-1)?CV.ch:null}
 setInterval(function(){var id=S.user?chOf():null;qb.hidden=!id;var g=$('codeGo');if(g&&!$('codeCam')){var b=document.createElement('button');b.className='chip';b.id='codeCam';b.textContent='📷';b.setAttribute('aria-label','scan');b.onclick=scanQR;g.insertAdjacentElement('afterend',b)}},800);
 function showShare(id){
-  var c=chans()[id];if(!c)return;var link=location.href.split('#')[0].split('?')[0]+'#join='+c.code;
+  var c=chans()[id];if(!c)return;
+  if(c.kind==='commercial'||(window.ccIsCommChan&&window.ccIsCommChan(id))){return openCardSheet(c)}var link=location.href.split('#')[0].split('?')[0]+'#join='+c.code;
   openSheet('<b>'+fl(_tx('مشاركة القناة'),'Share channel')+'</b>'+
     '<div class="swN">'+esc((c.icon||'📣')+' '+c.name)+'</div>'+
     '<div id="qrBox" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:12px;margin:8px auto;width:fit-content;min-height:244px;min-width:244px"></div>'+
