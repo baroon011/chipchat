@@ -676,7 +676,7 @@ function openChanManage0(id){var C=chans(),c=C[id];if(!c)return;var own=c.owner=
     if(a==='cp'){try{navigator.clipboard.writeText(c.code)}catch(e){}toast(t('copied'))}
     else if(a==='rg'){c.code=genCode();chSave(C);openChanManage(id)}
     else if(a==='au'){c.auto=!c.auto;chSave(C);openChanManage(id)}
-    else if(a==='dc'){delete C[id];chSave(C);try{localStorage.removeItem('cc_msgs_ch:'+id)}catch(e){}closeSheet();if(CV&&CV.ch===id){CV=null;$('conv').hidden=true}renderRooms()}});
+    else if(a==='dc'){(async function(){var nm=(c&&c.name)||'';var typed=null;try{typed=prompt('حذف نهائي لا يمكن التراجع عنه. اكتب اسم القناة بالضبط للتأكيد: '+nm)}catch(e){}if(typed===null||typed.trim()!==nm.trim()){toast('تم الإلغاء');return}var sid=(c&&c.serverId)||id;var r=await window.ccSb.rpc('chan_hard_delete',{p_chan:sid});if(r.error){toast('⚠ '+String((r.error&&r.error.message)||r.error).slice(0,120));return}var C2=chans();delete C2[id];chSave(C2);try{localStorage.removeItem('cc_msgs_ch:'+id)}catch(e){}closeSheet();if(CV&&CV.ch===id){CV=null;$('conv').hidden=true}renderRooms();toast('تم حذف القناة نهائياً')})();return}});
   bindAll('[data-ac]',function(b){var C=chans(),c=C[id],p=c.pending.splice(+b.dataset.ac,1)[0];if(p&&c.members.indexOf(p.nick)<0)c.members.push(p.nick);chSave(C);if(p)Net.send({id:uid(),room:'ch:'+id,type:'sys',text:'✅ '+p.nick+' — '+t('accepted'),nick:myNick(),at:Date.now()});openChanManage(id);renderRooms()});
   bindAll('[data-rj]',function(b){var C=chans(),c=C[id];c.pending.splice(+b.dataset.rj,1);chSave(C);openChanManage(id);renderRooms()});
   bindAll('[data-kk]',function(b){var C=chans(),c=C[id];c.members=c.members.filter(function(x){return x!==b.dataset.kk});chSave(C);openChanManage(id)})}
