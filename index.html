@@ -738,7 +738,7 @@ window.addEventListener('storage',function(e){if(e.key!=='cc_lrooms'||!S.user)re
 
 /* ---- 12) اشتراك القنوات (شهري/سنوي) + وسائط ---- */
 var PL={trial:{p:0,d:30},monthly:{p:500,d:30},yearly:{p:5000,d:365}};
-function chActive(c){return !!(c&&(c.type==='stars'||(c.exp&&c.exp>Date.now())))}
+function chActive(c){return !!(c&&(c.type==='stars'||c.kind==='commercial'||(c.exp&&c.exp>Date.now())))}
 function planBtns(){return ['trial','monthly','yearly'].map(function(k){return '<button class="it" data-pl="'+k+'"><span>'+(k==='trial'?fl(_tx('تجربة مجانية '),'Free trial ')+PL[k].d+' '+fl(_tx('أيام'),'days'):x(k))+'</span><small>'+((TEST_MODE||PL[k].p===0)?t('free'):'🪙 '+PL[k].p)+'</small></button>'}).join('')}
 async function paySub(pk){if(FREE())return true;if(!PL[pk])return false;return await coinSpend(PL[pk].p,'sub',pk)}
 /* الشراء الحقيقي يتم على الخادم: يخصم العملات ويسجّل تاريخ الانتهاء. يعيد وقت الانتهاء بالمللي ثانية أو null */
