@@ -10501,7 +10501,7 @@ document.addEventListener('click',function(e){
 
   /* ===== الغلاف الأساسي: الوردة الزجاجية المتحركة (يظهر افتراضياً للجميع، ويمكن الرجوع إليه في أي وقت) ===== */
   (function(){
-    var PRESET='preset:glass',GRAD='linear-gradient(135deg,#2a1a5e,#7c1dff 55%,#ff3df2)';
+    var PRESET='preset:glass',GRAD='linear-gradient(135deg,#ffffff 0%,#fff7fd 50%,#ffe9f8 100%)';
     var cvEl=null,raf=0,t=0,ST=null,PET=null,on=false;
     var BANDS=16,band=new Array(16).fill(0),prevSum=0,kick=0,level=0,lvAvg=0.05;
     var an=null,bins=null,actx=null,stream=null,micOn=false;
@@ -10536,7 +10536,14 @@ document.addEventListener('click',function(e){
     }
     // قراءة الصوت من الميكروفون: 16 نطاقاً وكشف سريع للنغمات
     function readMic(){
-      if(!micOn||!an){kick*=0.9;level*=0.9;for(var z=0;z<BANDS;z++)band[z]*=0.9;return}
+      if(!micOn||!an){
+        // نبض إيقاعي داخلي (حوالي 118 نبضة في الدقيقة) يجعل الوردة حية حتى بدون صوت أو مع سماعات الرأس
+        var bp=t*1.64,ph=bp-Math.floor(bp),env=Math.pow(1-ph,4);
+        kick=Math.max(kick*0.85,env*0.8);
+        level=0.25+0.35*env;
+        for(var z=0;z<BANDS;z++)band[z]=0.25+0.5*env*(0.5+0.5*Math.sin(t*(0.7+z*0.13)+z*1.7));
+        return;
+      }
       an.getByteFrequencyData(bins);
       var n=bins.length,sum=0;
       for(var b=0;b<BANDS;b++){
@@ -10545,9 +10552,9 @@ document.addEventListener('click',function(e){
         v=v/(c-a)/255;band[b]=v;sum+=v;
       }
       var flux=Math.max(0,sum-prevSum)/BANDS;prevSum=sum;
-      kick=Math.max(kick*0.82,Math.min(1,flux*14));
+      kick=Math.max(kick*0.82,Math.min(1,flux*34));
       lvAvg=lvAvg*0.995+(sum/BANDS)*0.005;
-      level=Math.min(1,(sum/BANDS)/(lvAvg+0.03));
+      level=Math.min(1,(sum/BANDS)/(lvAvg+0.01));
     }
     function petal(ctx,cx,cy,ang,L,hw,r0,fill,stroke){
       var dx=Math.cos(ang),dy=Math.sin(ang),nx=-dy,ny=dx,bx=cx+dx*r0,by=cy+dy*r0,tx=cx+dx*L,ty=cy+dy*L,l=L-r0;
@@ -10570,21 +10577,21 @@ document.addEventListener('click',function(e){
       // حركة هادئة بلا صوت: نبض جماعي بطيء يجعل الفريق يتنفس كقطعة واحدة
       var idle=0.12+0.12*Math.pow(0.5+0.5*Math.sin(t*1.6),2);
       readMic();
-      var beat=micOn?Math.min(1,kick*0.9+level*0.4):idle;
-      var sway=Math.sin(t*0.9)*0.16+(micOn?Math.sin(t*1.7)*0.06*(0.5+beat):0);
+      var beat=Math.min(1,kick*0.9+level*0.4)*(micOn?1:0.85)+idle*0.15;
+      var sway=Math.sin(t*0.9)*0.16+Math.sin(t*1.7)*0.06*(0.5+beat);
       var cx=W/2,cy=H/2,R=Math.min(W,H)*0.44;
-      ctx.globalCompositeOperation='screen';
+      ctx.globalCompositeOperation='source-over';
       for(var i=0;i<ST.length;i++){
         var q=ST[i],tw=0.5+0.5*Math.sin(t*q.f+q.ph),sx=q.x*W,sy=q.y*H,gl=0.2+tw*0.5;
-        ctx.fillStyle='rgba(255,255,255,'+gl.toFixed(3)+')';ctx.beginPath();ctx.arc(sx,sy,q.r*(0.8+tw*0.4),0,Math.PI*2);ctx.fill();
+        ctx.save();ctx.globalAlpha=Math.min(1,gl+0.35);ctx.fillStyle='#ff3df2';ctx.shadowColor='#ff3df2';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(sx,sy,q.r*(0.8+tw*0.4),0,Math.PI*2);ctx.fill();ctx.restore();
       }
       for(var p=0;p<PET.length;p++){
         var P=PET[p];
-        var bv=micOn?Math.min(1,(band[(Math.floor(P.idx*BANDS/RINGS[P.ring].n)+P.ring*3)%BANDS]||0)*2.2):0;
+        var bv=Math.min(1,(band[(Math.floor(P.idx*BANDS/RINGS[P.ring].n)+P.ring*3)%BANDS]||0)*(micOn?3.2:1));
         P.v=Math.max(P.v*0.8,bv);
         var ang=P.ang+sway*(1-P.ring*0.25),L=R*P.rf*(0.92+0.1*beat+0.15*P.v),hw=L*0.24*P.base,a=0.2+beat*0.35+P.v*0.4;
         var hue=268+P.ring*6+(P.idx/RINGS[P.ring].n)*10+beat*30;
-        petal(ctx,cx,cy,ang,L,hw,R*0.04,'hsla('+hue.toFixed(1)+',95%,'+(60+beat*18+P.v*15).toFixed(1)+'%,'+a.toFixed(3)+')','rgba(245,235,255,0.35)');
+        petal(ctx,cx,cy,ang,L,hw,R*0.04,'hsla('+hue.toFixed(1)+',95%,'+(60+beat*18+P.v*15).toFixed(1)+'%,'+a.toFixed(3)+')','rgba(255,255,255,'+(0.35+beat*0.5+P.v*0.3).toFixed(3)+')');
       }
       ctx.beginPath();ctx.arc(cx,cy,R*0.05,0,Math.PI*2);ctx.fillStyle='hsla(300,100%,85%,0.45)';ctx.fill();
       ctx.globalCompositeOperation='source-over';
