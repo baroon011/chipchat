@@ -4249,7 +4249,7 @@ async function starsFollow(r){var x=await window.ccSb.rpc('stars_follow',{p_chan
   if(x.error){console.warn(x.error);return toast(fl(_tx('تعذرت المتابعة: '),'Could not follow: ')+String(x.error.message||''))}
   toast('✔ '+fl(_tx('تمت المتابعة'),'Followed'));try{await pullChans()}catch(e){console.warn(e)}try{renderRooms()}catch(e){}}
 function srShow(q,rows){
-  var lab={owner:fl(_tx('أنت المالك'),'You own it'),member:fl(_tx('أنت عضو ✔'),'Member ✔'),pending:fl(_tx('⏳ طلبك قيد المراجعة'),'⏳ Request pending')};
+  var lab={commercial:fl(_tx('🛍 قناة تجارية'),'🛍 Commercial channel'),owner:fl(_tx('أنت المالك'),'You own it'),member:fl(_tx('أنت عضو ✔'),'Member ✔'),pending:fl(_tx('⏳ طلبك قيد المراجعة'),'⏳ Request pending')};
   openSheet('<b>🔎 '+esc(q)+'</b>'+(rows.length?rows.map(function(r){return '<button class="room" data-sr="'+esc(r.id)+'"><i>'+esc(r.icon||'📣')+'</i><div><b>'+esc(r.name)+vmk(r.id)+'</b><small>'+(r.owner?esc(r.owner)+' • ':'')+(r.n!=null?r.n+' '+fl(_tx('متابع'),'followers')+' • ':'')+(lab[r.st]||fl(_tx('📣 قناة نشر'),'📣 Publishing'))+'</small></div><em>›</em></button>'}).join(''):'<div class="swN">'+fl(_tx('لا توجد قنوات نشر بهذا الاسم. قنوات المؤسسات الخاصة تُفتح بكود الدعوة فقط.'),'No publishing channels match. Private organization channels open with an invite code only.')+'</div>'));
   bindAll('[data-sr]',function(b){var r=rows.filter(function(z){return z.id===b.dataset.sr})[0];if(!r)return;if(r._code){closeSheet();return guestEnter(r._code)}if(r._uid){closeSheet();return openProfileView(r._uid)}pubEntry(r)})}
 async function nameSearch(q){
@@ -4259,7 +4259,7 @@ async function nameSearch(q){
   if(S.user&&S.user.sv){
     var r=await sb.rpc('chan_search',{q:q});
     if(r.error){console.warn(r.error);srWarn(r.error)}
-    else(r.data||[]).forEach(function(x){var c=C[x.cid];rows[x.cid]=Object.assign(rows[x.cid]||{},{id:x.cid,name:x.cname,icon:x.cicon,owner:x.owner_nick,n:x.mcount,st:c?chStatus(c):'none'})})}
+    else(r.data||[]).forEach(function(x){var c=C[x.cid];rows[x.cid]=Object.assign(rows[x.cid]||{},{id:x.cid,name:x.cname,icon:x.cicon,owner:x.owner_nick,n:x.mcount,st:(x.ckind==='commercial')?'commercial':(c?chStatus(c):'none')})})}
   var stR=await window.ccSb.rpc('store_search',{p_q:q}).catch(function(){return {data:[]}});
   ((stR&&stR.data)||[]).forEach(function(x){rows['st:'+x.code]={id:'st:'+x.code,name:x.name,icon:'🛒',owner:'',n:'',st:'none',_code:x.code}});
   var peR=await window.ccSb.rpc('people_search',{p_q:q}).catch(function(){return {data:[]}});
@@ -8559,7 +8559,7 @@ function chOf(){if(!CV||!CV.ch||!$('conv')||$('conv').hidden)return null;var c=c
 setInterval(function(){var id=S.user?chOf():null;qb.hidden=!id;var g=$('codeGo');if(g&&!$('codeCam')){var b=document.createElement('button');b.className='chip';b.id='codeCam';b.textContent='📷';b.setAttribute('aria-label','scan');b.onclick=scanQR;g.insertAdjacentElement('afterend',b)}},800);
 function showShare(id){
   var c=chans()[id];if(!c)return;
-  if(c.kind==='commercial'||(window.ccIsCommChan&&window.ccIsCommChan(id))){return openCardSheet(c)}var link=location.href.split('#')[0].split('?')[0]+'#join='+c.code;
+  if(c.kind==='commercial'||(window.ccIsCommChan&&window.ccIsCommChan(id))){var shopBase=location.href.split('#')[0].split('?')[0];return window.ccSb.rpc('chan_share_code',{p_chan:(c.serverId||c.id)}).then(function(r){if(r.error||!r.data){return toast('⚠ '+String((r.error&&(r.error.message||r.error))||'no shop code').slice(0,140))}var shopLink=shopBase+'#shop='+r.data;try{openCardSheetWith(c,shopLink)}catch(e){openSheet('<b>'+fl(_tx('رابط المتجر'),'Shop link')+'</b><div class="swN" style="word-break:break-all;direction:ltr">'+esc(shopLink)+'</div>')}});}var link=location.href.split('#')[0].split('?')[0]+'#join='+c.code;
   openSheet('<b>'+fl(_tx('مشاركة القناة'),'Share channel')+'</b>'+
     '<div class="swN">'+esc((c.icon||'📣')+' '+c.name)+'</div>'+
     '<div id="qrBox" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:12px;margin:8px auto;width:fit-content;min-height:244px;min-width:244px"></div>'+
