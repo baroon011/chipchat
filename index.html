@@ -21206,7 +21206,7 @@ function nrTickHtml(anns){
   var D={kind:'text',body:'',bg:'p',file:null};
 
   function sb(){return window.ccSb}
-  function ensureBtn(){
+  function ensureBtn(){return;
     var cov=document.getElementById('hmCover');
     if(!cov||document.getElementById('stBtn'))return;
     var b=document.createElement('button');b.id='stBtn';b.type='button';
