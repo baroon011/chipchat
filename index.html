@@ -13538,35 +13538,28 @@ function ccGoNotif(n){
 </script>
 
 <script>
-/* ===== الضغط على صورة المنشور مرتين = لايك ===== */
-(function(){
-  var st=document.createElement('style');
-  st.textContent='.ppHeart{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.3);font-size:72px;pointer-events:none;opacity:0;filter:drop-shadow(0 0 12px #ff3df2);transition:transform .35s cubic-bezier(.2,.9,.3,1.4),opacity .35s;z-index:5}.ppHeart.show{opacity:1;transform:translate(-50%,-50%) scale(1)}.ppHeart.out{opacity:0;transform:translate(-50%,-50%) scale(1.25)}';
-  document.head.appendChild(st);
-  var last={el:null,t:0};
-  function heart(host){
-    var h=document.createElement('div');h.className='ppHeart';h.textContent='❤';
-    if(getComputedStyle(host).position==='static')host.style.position='relative';
-    host.appendChild(h);
-    requestAnimationFrame(function(){h.classList.add('show')});
-    setTimeout(function(){h.classList.add('out')},600);
-    setTimeout(function(){h.remove()},1000);
-  }
-  function tap(img){
-    var card=img.closest('.ppCard');if(!card)return;
-    var likeBtn=card.querySelector('[data-act="react"][data-val="1"]');
-    heart(img.parentNode&&img.parentNode.nodeType===1?img.parentNode:card);
-    if(likeBtn&&!likeBtn.classList.contains('on'))likeBtn.click();
-  }
-  document.addEventListener('click',function(e){
-    var img=e.target;
-    if(!img||img.tagName!=='IMG'||img.closest('.ppHd'))return;
-    if(!img.closest('.ppCard'))return;
-    var now=Date.now();
-    if(last.el===img&&now-last.t<400){last.el=null;last.t=0;e.stopPropagation();tap(img)}
-    else{last.el=img;last.t=now}
-  },true);
-})();
+/* ===== صورة المنشور: لمسة واحدة تكبّرها، ولمسة أخرى عليها أو زر ✕ تغلقها ===== */
+window.ccZoomPost=function(src){
+  if(!src||document.getElementById('ppZoom'))return;
+  var o=document.createElement('div');o.id='ppZoom';
+  o.style.cssText='position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;touch-action:pinch-zoom;cursor:zoom-out';
+  var im=document.createElement('img');im.alt='';im.src=src;
+  im.style.cssText='width:100%;height:100%;object-fit:contain;touch-action:pinch-zoom;display:block';
+  var x=document.createElement('button');x.type='button';x.textContent='✕';
+  x.setAttribute('aria-label',fl(_tx('إغلاق'),'Close'));
+  x.style.cssText='position:fixed;top:calc(12px + env(safe-area-inset-top,0px));inset-inline-end:12px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:#000;font-size:20px;font-weight:700;z-index:2';
+  function kd(e){if(e.key==='Escape')close()}
+  function close(){o.remove();document.removeEventListener('keydown',kd)}
+  o.onclick=close;o.appendChild(im);o.appendChild(x);
+  document.addEventListener('keydown',kd);
+  document.body.appendChild(o);
+};
+document.addEventListener('click',function(e){
+  var img=e.target;
+  if(!img||img.tagName!=='IMG'||!img.hasAttribute('data-ppi')||!img.closest('.ppCard')||img.closest('.ppHd'))return;
+  e.stopPropagation();e.preventDefault();
+  window.ccZoomPost(img.src);
+},true);
 </script>
 
 <script>
@@ -15617,6 +15610,7 @@ html[data-th="white"] #menu .it,html[data-th="white"] #drawer .it,html[data-th="
     timer=setTimeout(function(){
       timer=0;fired=true;
       if(!el.classList.contains('ppCard')&&el.querySelector('.mm')){var mid=el.getAttribute('data-id')||'',nk=el.getAttribute('data-n')||'';if(mid&&window.CV&&CV.key)openNameMenu(nk,mid,'',CV.key);return}
+      if(el.classList.contains('ppCard')&&el.querySelector('.ppDel')){window.ccEditPost(el);return}
       var txt=el.classList.contains('ppCard')?((el.querySelector('.ppTx')||{}).textContent||''):((el.querySelector('span')||el).textContent||'');
       txt=txt.trim();
       if(txt)copyTxt(txt);
@@ -22037,6 +22031,35 @@ Object.assign(SV,{"أدوات": "Verktyg", "اختصارات": "Genvägar", "ن�
     });
   };
 })();
+</script>
+<style>
+/* ===== الشريط العلوي: أزرار بلا دوائر ===== */
+html body #app>.bar>button,html body #app>.bar>.chip,html body #conv .bar>button,html body #conv .bar>.chip,
+html[data-th] body #app>.bar>button,html[data-th] body #app>.bar>.chip,html[data-th] body #conv .bar>button,html[data-th] body #conv .bar>.chip{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;text-shadow:none!important;outline:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+</style>
+<script>
+/* ترجمات النصوص الجديدة */
+Object.assign(SV,{"تعديل المنشور":"Redigera inlägg","حفظ":"Spara","إلغاء":"Avbryt","تم حفظ التعديل":"Ändringen sparades","تعذّر الحفظ":"Kunde inte spara","إغلاق":"Stäng"});
+Object.assign(TR,{"تعديل المنشور":"Gönderiyi düzenle","حفظ":"Kaydet","إلغاء":"İptal","تم حفظ التعديل":"Değişiklik kaydedildi","تعذّر الحفظ":"Kaydedilemedi","إغلاق":"Kapat"});
+/* تعديل منشور: ضغط مطوّل على منشورك */
+window.ccEditPost=function(card){
+  var pid=card.dataset.pid;if(!pid)return;
+  var tx=card.querySelector('.ppTx');var cur=tx?tx.textContent:'';
+  if(cur==='📷'||cur==='🎬')cur='';
+  openSheet('<b>✏ '+esc(fl(_tx('تعديل المنشور'),'Edit post'))+'</b>'+
+    '<textarea id="peTxt" maxlength="20000" style="width:100%;min-height:120px;margin-top:10px;box-sizing:border-box;border-radius:14px;padding:10px;background:rgba(255,255,255,.07);color:inherit;border:1px solid rgba(183,140,255,.4);font:inherit"></textarea>'+
+    '<div style="display:flex;gap:8px;margin-top:10px"><button class="it" id="peNo" style="flex:1;justify-content:center">'+esc(fl(_tx('إلغاء'),'Cancel'))+'</button>'+
+    '<button class="go" id="peOk" style="flex:1">'+esc(fl(_tx('حفظ'),'Save'))+'</button></div>');
+  var ta=document.getElementById('peTxt');ta.value=cur;
+  document.getElementById('peNo').onclick=closeSheet;
+  document.getElementById('peOk').onclick=async function(){
+    var b=this;b.disabled=true;
+    var r=await window.ccSb.rpc('pp_edit',{p_id:pid,p_body:ta.value.trim()});
+    if(r.error){b.disabled=false;toast(fl(_tx('تعذّر الحفظ'),'Could not save'));return}
+    closeSheet();toast(fl(_tx('تم حفظ التعديل'),'Edit saved'));
+    if(typeof window.loadPP==='function')window.loadPP();
+  };
+};
 </script>
 </body>
 </html>
