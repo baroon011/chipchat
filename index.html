@@ -11300,7 +11300,7 @@ document.addEventListener('click',function(e){
     m.dataset.rose='1';
     var parent=m.parentNode;
     if(getComputedStyle(parent).position==='static')parent.style.position='relative';
-    m.style.position='relative';m.style.zIndex='1';
+    m.style.position='relative';m.style.zIndex='1';m.style.setProperty('background','transparent','important');
     var cv=document.createElement('canvas');cv.className='roseBg';
     cv.style.cssText='position:absolute;pointer-events:none;z-index:0';
     parent.insertBefore(cv,m);
