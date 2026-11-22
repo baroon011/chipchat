@@ -8844,7 +8844,7 @@ function renderChans() {
 }
 function openChansPage() {
   renderChans();
-  showChannelsRaw(); // مؤقت: عرض بيانات القنوات الحقيقية كما يعيدها الخادم، للتحقق من شكلها
+  loadMyChannels();
   chansPage.hidden = false;
   requestAnimationFrame(() => chansPage.classList.add('open'));
 }
@@ -9272,6 +9272,30 @@ async function showChannelsRaw() {
   pre.textContent = error ? 'ERROR: ' + error.message : JSON.stringify(data, null, 2);
   chanList.replaceChildren(pre);
   chanEmpty.hidden = true;
+}
+
+// قنواتي: القنوات التي يملكها المستخدم، والقنوات التي انضم إليها كعضو (من جدولي chans و chan_members)
+async function loadMyChannels() {
+  const { data: { user } } = await sbClient.auth.getUser();
+  if (!user) return;
+  const [owned, joined] = await Promise.all([
+    sbClient.from('chans').select('id,name,icon,owner').eq('owner', user.id),
+    sbClient.from('chan_members').select('chan_id').eq('user_id', user.id),
+  ]);
+  const ownedRows = owned.data || [];
+  const ownedIds = new Set(ownedRows.map((c) => c.id));
+  const otherIds = (joined.data || []).map((r) => r.chan_id).filter((id) => !ownedIds.has(id));
+  let others = [];
+  if (otherIds.length) {
+    const r = await sbClient.from('chans').select('id,name,icon,owner').in('id', otherIds);
+    others = r.data || [];
+  }
+  const demo = myChannels.filter((c) => c.type === 'institutions');
+  myChannels.splice(0, myChannels.length,
+    ...ownedRows.map((c) => ({ id: c.id, name: c.name, icon: c.icon, role: 'owner' })),
+    ...others.map((c) => ({ id: c.id, name: c.name, icon: c.icon, role: 'member' })),
+    ...demo);
+  renderChans();
 }
 
   </script>
