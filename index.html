@@ -9371,8 +9371,7 @@ async function loadChanAnn() {
   }
   const d = Array.isArray(data) ? { items: data } : (data || {});
   const items = d.items || d.announcements || [];
-  if (!items.length) chanSay('[تشخيص] ' + JSON.stringify(data).slice(0, 300));
-  else chanSay('');
+  chanSay('');
   const role = ['owner', 'manager'].includes(d.role) ? d.role : 'member';
   chanViewRole.textContent = t('chan.youAre') + ' ' + t('chan.role.' + role);
   chanCompose.hidden = !d.can_post;
@@ -9488,9 +9487,11 @@ async function loadChanAnnFeed() {
 }
 
 // كتالوج القناة التجارية (للقراءة): الفروع ← الأقسام ← المنتجات، من cat_list
+// قنوات الدفع تُخزَّن بمعرّف يبدأ بحرف p قبل الـ uuid، والدوال تتوقع الـ uuid وحده
+function catSrvId(id) { return /^p[0-9a-f]{8}-/i.test(id) ? id.slice(1) : id; }
 function chanIconText(x) { return x && !/^(data:|https?:)/.test(x) ? x + ' ' : ''; }
 async function buildCatalogNodes() {
-  const { data, error } = await sbClient.rpc('cat_list', { p_chan: currentChan.id });
+  const { data, error } = await sbClient.rpc('cat_list', { p_chan: catSrvId(currentChan.id) });
   if (error) return [chanNote(t('chan.loadErr') + ': ' + error.message)];
   const branches = Array.isArray(data) ? data : [];
   if (!branches.length) return [chanNote(t('chan.noCat'))];
