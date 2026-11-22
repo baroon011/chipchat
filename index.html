@@ -14978,6 +14978,11 @@ html[data-wp]:not([data-wpp])[data-th="white"] body,html[data-wp]:not([data-wpp]
 html[data-wp]:not([data-wpp]):not([data-th="white"]) body,html[data-wp]:not([data-wpp]):not([data-th="white"]) #app,html[data-wp]:not([data-wpp]):not([data-th="white"]) #conv{background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)),var(--wp) center/cover fixed!important;background-color:transparent!important}
 </style>
 <style id="loginBg">html[data-wp][data-wpp] #login{background:linear-gradient(rgba(12,5,30,.25),rgba(12,5,30,.25)),var(--wp) center/cover fixed!important;background-color:transparent!important;background-image:linear-gradient(rgba(12,5,30,.25),rgba(12,5,30,.25)),var(--wp)!important;-webkit-backdrop-filter:none;backdrop-filter:none}</style>
+<style id="bgWhite">
+/* الثيم الأبيض يمسح صورة الخلفية عن #app و#conv (background-image:none)، فنعيدها هنا بأولوية أعلى */
+html[data-wp][data-th="white"] #app,html[data-wp][data-th="white"] #conv{background-color:transparent!important;background-image:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.35)),var(--wp)!important;background-size:auto,cover!important;background-position:center,center!important;background-attachment:fixed,fixed!important}
+html[data-wp][data-wpp][data-th="white"] #app,html[data-wp][data-wpp][data-th="white"] #conv{background-image:var(--wp)!important;background-size:cover!important}
+</style>
 <style id="bgMsgs">html[data-wp] body #msgs,html[data-wp] body #cmsgs,html[data-wp][data-th] body #msgs,html[data-wp][data-th] body #cmsgs,html[data-wp] body #conv #msgs,html[data-wp][data-th] body #conv #msgs,html[data-wp][data-th] body #conv #cmsgs{background:transparent!important;background-image:none!important}</style>
 <script>
 /* ===== شراء القنوات يدوياً: أنواع القنوات + تواصل مع المسؤول. عدّل CH_SHOP أدناه ===== */
@@ -22035,7 +22040,7 @@ Object.assign(SV,{"أدوات": "Verktyg", "اختصارات": "Genvägar", "ن�
 <style>
 /* ===== الشريط العلوي: أزرار بلا دوائر ===== */
 html body .bar>button::before,html body .bar>button::after,html body .bar>.chip::before,html body .bar>.chip::after,html[data-th] body .bar>button::before,html[data-th] body .bar>button::after,html[data-th] body .bar>.chip::before,html[data-th] body .bar>.chip::after,html[data-th] body #app .bar>button::before,html[data-th] body #app .bar>button::after{content:none!important;display:none!important;box-shadow:none!important;background:none!important}
-html body .bar>button,html body .bar>.chip,html body #app .bar>button,html body #app .bar>.chip,html[data-th] body .bar>button,html[data-th] body .bar>.chip,html[data-th] body #app .bar>button,html[data-th] body #app .bar>.chip,html[data-th] body #conv .bar>button,html[data-th] body #conv .bar>.chip,html[data-th] body #homeV .bar>button,html[data-th] body #homeV .bar>.chip{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;text-shadow:none!important;outline:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html body #app>.bar>*:not(img):not(#roomTitle):not(#avPop):not(#barLogo):not(#crownB):not(.rdot),html body #conv .bar>*:not(img):not(#cTitle):not(#avPop):not(.rdot):not(.vfk),html[data-th] body #app>.bar>*:not(img):not(#roomTitle):not(#avPop):not(#barLogo):not(#crownB):not(.rdot),html[data-th] body #conv .bar>*:not(img):not(#cTitle):not(#avPop):not(.rdot):not(.vfk){background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;text-shadow:none!important;outline:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 </style>
 <script>
 /* ترجمات النصوص الجديدة */
@@ -22063,10 +22068,10 @@ window.ccEditPost=function(card){
 </script>
 <script>
 /* زر الترجمة الفورية في الشريط مُخفى: يبقى في قائمة ☰ (يُستدعى برمجياً) ولا يظهر خلف قائمة الإعدادات */
-html body #trRb,html[data-th] body #trRb,html body #avPop #trRb{display:none!important}
+(function(){var st=document.createElement('style');st.textContent='html body #trRb,html[data-th] body #trRb,html body #avPop #trRb{display:none!important}';document.head.appendChild(st)})();
 /* ===== أزرار الأيقونات في الشريط العلوي: بلا دوائر ولا حلقات (تُطبَّق كأنماط داخلية بأولوية قصوى) ===== */
 (function(){
-  var SEL='#app button[data-svgi],#app .bar>button,#app .bar>.chip,#conv .bar>button,#conv .bar>.chip';
+  var SEL='#app>.bar>*:not(img):not(#roomTitle):not(#avPop):not(#barLogo):not(#crownB):not(.rdot),#conv .bar>*:not(img):not(#cTitle):not(#avPop):not(.rdot):not(.vfk),#app button[data-svgi]';
   var PROPS={'background':'transparent','background-image':'none','border':'0','border-color':'transparent','box-shadow':'none','outline':'0','filter':'none','text-shadow':'none'};
   function clean(){
     var els=document.querySelectorAll(SEL);
