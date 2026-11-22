@@ -22061,5 +22061,22 @@ window.ccEditPost=function(card){
   };
 };
 </script>
+<script>
+/* زر الترجمة الفورية في الشريط مُخفى: يبقى في قائمة ☰ (يُستدعى برمجياً) ولا يظهر خلف قائمة الإعدادات */
+html body #trRb,html[data-th] body #trRb,html body #avPop #trRb{display:none!important}
+/* ===== أزرار الأيقونات في الشريط العلوي: بلا دوائر ولا حلقات (تُطبَّق كأنماط داخلية بأولوية قصوى) ===== */
+(function(){
+  var SEL='#app button[data-svgi],#app .bar>button,#app .bar>.chip,#conv .bar>button,#conv .bar>.chip';
+  var PROPS={'background':'transparent','background-image':'none','border':'0','border-color':'transparent','box-shadow':'none','outline':'0','filter':'none','text-shadow':'none'};
+  function clean(){
+    var els=document.querySelectorAll(SEL);
+    for(var i=0;i<els.length;i++){
+      var el=els[i];if(el.closest('#comp,#hmCover,#cctl,#call'))continue;
+      for(var k in PROPS)el.style.setProperty(k,PROPS[k],'important');
+    }
+  }
+  clean();setInterval(function(){try{clean()}catch(e){}},600);
+})();
+</script>
 </body>
 </html>
