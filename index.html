@@ -2859,7 +2859,7 @@ function apply(){var t=cur(),h=document.documentElement;
   var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',TC[t.c])}
 function setT(c,wp,bg){var t=cur();if(c)t.c=c;if(wp!==undefined)t.wp=wp;if(bg!==undefined)t.bg=bg;try{localStorage.setItem('cc_theme',JSON.stringify(t))}catch(e){toast('⚠ '+fl(_tx('مساحة التخزين ممتلئة — جرّب صورة أصغر'),'Storage full — try a smaller picture'));return false}apply();return true}
 var op2=openProfile;openProfile=function(keep){op2.apply(this,arguments);if(!S.user)return;var t=cur(),N={purple:fl(_tx('بنفسجي'),'Purple'),green:fl(_tx('أخضر'),'Green'),black:fl(_tx('أسود'),'Black'),white:fl(_tx('أبيض'),'White'),blue:fl(_tx('أزرق'),'Blue')};
-  var __a=document.querySelector('#sheet > #pGal')||document.querySelector('#sheet > .pfT')||document.querySelector('#sheet > .pfR')||$('pFr');if(!__a)return;__a.insertAdjacentHTML('afterend','<div class="sec">🎨 '+fl(_tx('ثيم الدردشة'),'Chat theme')+'</div><div class="thr">'+Object.keys(TC).map(function(k){return '<button data-th="'+k+'" class="'+(t.c===k?'on':'')+'" style="background:'+SW[k]+'">'+(t.c===k?'✔':'')+'</button>'}).join('')+'</div><div class="thl">'+Object.keys(TC).map(function(k){return '<span>'+N[k]+'</span>'}).join('')+'</div>'+
+  var __a=$('sw')||document.querySelector('#sheet > #pGal')||document.querySelector('#sheet > .pfT')||document.querySelector('#sheet > .pfR')||$('pFr');if(!__a)return;__a.insertAdjacentHTML('afterend','<div class="sec">🎨 '+fl(_tx('ثيم الدردشة'),'Chat theme')+'</div><div class="thr">'+Object.keys(TC).map(function(k){return '<button data-th="'+k+'" class="'+(t.c===k?'on':'')+'" style="background:'+SW[k]+'">'+(t.c===k?'✔':'')+'</button>'}).join('')+'</div><div class="thl">'+Object.keys(TC).map(function(k){return '<span>'+N[k]+'</span>'}).join('')+'</div>'+
    '<div class="sec">🖼 '+fl(_tx('خلفيات جاهزة'),'Ready backgrounds')+'</div><div class="bgs"><button class="bgt'+((!t.wp&&(!t.bg||t.bg==='plain'))?' on':'')+'" data-bg="plain" style="background:var(--bg)">'+fl(_tx('بدون'),'None')+'</button>'+BGS.map(function(g){var on=!t.wp&&t.bg===g[0],nm=g[0]==='special'?fl(SPN[t.c][0],SPN[t.c][1]):fl(g[1],g[2]);return '<button class="bgt'+(on?' on':'')+'" data-bg="'+g[0]+'" style="background-image:'+bgUrl(g[0],t.c).replace(/"/g,'&quot;')+'">'+nm+'</button>'}).join('')+'</div>'+'<input type="file" id="thF" accept="image/*" hidden><button class="it" id="thUp" style="margin-top:8px"><span>🖼 '+fl(_tx('خلفية المحادثة من جهازك'),'Chat background from your device')+'</span></button>'+(t.wp?'<button class="it" id="thRm"><span>↺ '+fl(_tx('إزالة الخلفية'),'Remove background')+'</span></button>':''));
   [].forEach.call($('sheet').querySelectorAll('[data-th]'),function(b){b.onclick=function(){if(setT(b.dataset.th))openProfile(true)}});
   [].forEach.call($('sheet').querySelectorAll('[data-bg]'),function(b){b.onclick=function(){if(setT(null,'',b.dataset.bg))openProfile(true)}});
@@ -14978,6 +14978,10 @@ html[data-wp]:not([data-wpp])[data-th="white"] body,html[data-wp]:not([data-wpp]
 html[data-wp]:not([data-wpp]):not([data-th="white"]) body,html[data-wp]:not([data-wpp]):not([data-th="white"]) #app,html[data-wp]:not([data-wpp]):not([data-th="white"]) #conv{background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)),var(--wp) center/cover fixed!important;background-color:transparent!important}
 </style>
 <style id="loginBg">html[data-wp][data-wpp] #login{background:linear-gradient(rgba(12,5,30,.25),rgba(12,5,30,.25)),var(--wp) center/cover fixed!important;background-color:transparent!important;background-image:linear-gradient(rgba(12,5,30,.25),rgba(12,5,30,.25)),var(--wp)!important;-webkit-backdrop-filter:none;backdrop-filter:none}</style>
+<style id="loginFit">
+/* نافذة الدخول تتمركز بـ justify/align-items:center، فإذا طال المحتوى يُقصّ الجزء العلوي ولا يمكن التمرير إليه (ويختفي زر اللغة معه). الهوامش التلقائية تحل ذلك */
+html body #login>*{margin-block:auto!important}
+</style>
 <style id="bgWhite">
 /* الثيم الأبيض يمسح صورة الخلفية عن #app و#conv (background-image:none)، فنعيدها هنا بأولوية أعلى */
 html[data-wp][data-th="white"] #app,html[data-wp][data-th="white"] #conv{background-color:transparent!important;background-image:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.35)),var(--wp)!important;background-size:auto,cover!important;background-position:center,center!important;background-attachment:fixed,fixed!important}
@@ -22081,6 +22085,31 @@ window.ccEditPost=function(card){
     }
   }
   clean();setInterval(function(){try{clean()}catch(e){}},600);
+})();
+</script>
+<script>
+/* ===== زر الرجوع في أندرويد: يغلق أعلى نافذة مفتوحة أولاً، ثم يعود من المحادثة إلى الرئيسية، ولا يخرج من التطبيق إلا بضغطتين متتاليتين ===== */
+Object.assign(SV,{"اضغط مرة أخرى للخروج":"Tryck igen för att avsluta"});
+Object.assign(TR,{"اضغط مرة أخرى للخروج":"Çıkmak için tekrar basın"});
+(function(){
+  var exitT=0;
+  function trap(){try{history.pushState({ccTrap:1},'',location.href)}catch(e){}}
+  function closeTop(){
+    var z=document.getElementById('ppZoom');if(z){z.click();return true}
+    var pk=document.getElementById('lgPick');if(pk){pk.remove();return true}
+    var sh=document.getElementById('sheet');if(sh&&sh.classList.contains('open')){closeSheet();return true}
+    var mn=document.getElementById('menu');if(mn&&mn.classList.contains('open')){mn.classList.remove('open');return true}
+    var cv=document.getElementById('conv');if(cv&&!cv.hidden){var cb=document.getElementById('cBack');if(cb){cb.click();return true}}
+    return false;
+  }
+  trap();
+  window.addEventListener('popstate',function(){
+    if(closeTop()){trap();return}
+    var now=Date.now();
+    if(now-exitT<2000){history.back();return}
+    exitT=now;trap();
+    toast(fl(_tx('اضغط مرة أخرى للخروج'),'Press back again to exit'));
+  });
 })();
 </script>
 </body>
