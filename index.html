@@ -2868,6 +2868,11 @@ textarea.st-input {
 .pf-mini { width: 30px; height: 30px; background: rgba(255, 255, 255, 0.3); border-width: 1px; box-shadow: none; opacity: 0.75; }
 .pf-mini svg { width: 15px; height: 15px; }
 
+.pf-post { background: #fff; border-radius: 16px; padding: 12px 14px; margin: 0 0 10px; box-shadow: 0 4px 14px rgba(124, 29, 255, 0.08); }
+.pf-post p { margin: 0 0 6px; white-space: pre-wrap; color: #1a0b33; }
+.pf-post small { color: #6b5b85; font-size: 12px; }
+.chan-raw { white-space: pre-wrap; word-break: break-all; font-size: 12px; direction: ltr; text-align: left; padding: 12px; border-radius: 12px; background: #fff; color: #1a0b33; }
+
   </style>
 </head>
 <body>
@@ -6375,6 +6380,11 @@ function initFeed(root) {
   }, 60000);
   return {
     addPost({ text = '', files = [] } = {}) {
+      // مع الربط بالخادم: النشر يُرسل للخادم ثم نعيد تحميل الحائط منه
+      if (feedServer.publish) {
+        feedServer.publish(text).then(() => feedServer.load && feedServer.load()).catch(() => {});
+        return;
+      }
       const media = files.map((f) => ({
         type: f.type.startsWith('video') ? 'video' : 'image',
         url: URL.createObjectURL(f),
@@ -6386,6 +6396,27 @@ function initFeed(root) {
       feedRender();
     },
   };
+}
+
+// ربط الحائط بالخادم: يُملأ من pp_feed، ويُنشر عبر pp_publish
+const feedServer = { publish: null, load: null };
+function feedLoad(rows, myUid) {
+  feedPosts.splice(0, feedPosts.length, ...rows.map((r) => {
+    const mine = r.user_id === myUid;
+    return {
+      id: r.id,
+      nick: mine ? FEED_ME : r.nick,
+      wall: mine ? FEED_ME : r.nick,
+      text: r.body || '',
+      at: new Date(r.created_at).getTime(),
+      likes: r.lk || 0,
+      dislikes: r.dk || 0,
+      mine: r.mine || 0,
+      media: [],
+      comments: [],
+    };
+  }));
+  feedRender();
 }
 
 // اكتشف: قائمة بنفس ترتيب الشريط الجانبي في الدردشة العامة، وزر "كن نجماً" عائم فوق الكيبورد.
@@ -8813,6 +8844,7 @@ function renderChans() {
 }
 function openChansPage() {
   renderChans();
+  showChannelsRaw(); // مؤقت: عرض بيانات القنوات الحقيقية كما يعيدها الخادم، للتحقق من شكلها
   chansPage.hidden = false;
   requestAnimationFrame(() => chansPage.classList.add('open'));
 }
@@ -9156,6 +9188,7 @@ authFormEl.addEventListener('submit', async (e) => {
     const { error } = await sbClient.auth.signInWithPassword({ email, password: pass });
     if (error) { authMsgEl.textContent = error.message; return; }
     showHome();
+    feedServer.load();
     return;
   }
   // القنوات والتسجيل: الحقول كاملة، والدخول الفعلي يحتاج الخادم
@@ -9193,7 +9226,53 @@ const SB_URL = 'https://mecdderydilajzzoqali.supabase.co';
 const SB_KEY = 'sb_publishable_VdHobwIJXQy6Yhb74CW0uQ_XoeiHopD';
 const sbClient = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 // إذا كانت الجلسة محفوظة من قبل يدخل المستخدم مباشرة
-sbClient.auth.getSession().then(({ data }) => { if (data && data.session) showHome(); });
+sbClient.auth.getSession().then(({ data }) => { if (data && data.session) { showHome(); feedServer.load(); } });
+
+// نشر المنشور وتحميل الحائط من الخادم (النصوص فقط في هذه المرحلة، والصور والفيديو لاحقاً)
+feedServer.publish = async (text) => {
+  const { error } = await sbClient.rpc('pp_publish', { p_body: text, p_img: null, p_vid: null });
+  if (error) throw error;
+};
+feedServer.load = async () => {
+  const { data: { user } } = await sbClient.auth.getUser();
+  if (!user) return;
+  const { data, error } = await sbClient.rpc('pp_feed', { lim: 30 });
+  if (error) return;
+  feedLoad(data || [], user.id);
+  renderMyWall((data || []).filter((r) => r.user_id === user.id));
+};
+function renderMyWall(rows) {
+  const wall = document.getElementById('pfWall');
+  if (!rows.length) {
+    const p = document.createElement('p');
+    p.className = 'chat-empty';
+    p.textContent = t('feed.empty');
+    wall.replaceChildren(p);
+    return;
+  }
+  wall.replaceChildren(...rows.map((r) => {
+    const card = document.createElement('article');
+    card.className = 'pf-post';
+    const body = document.createElement('p');
+    body.textContent = r.body || '';
+    const when = document.createElement('small');
+    when.textContent = new Date(r.created_at).toLocaleString();
+    card.append(body, when);
+    return card;
+  }));
+}
+
+// مؤقت للتحقق: يعرض ما يعيده الخادم لقنوات المستخدم الحالي كنص خام
+async function showChannelsRaw() {
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (!session) return;
+  const { data, error } = await sbClient.rpc('chan_member_channels');
+  const pre = document.createElement('pre');
+  pre.className = 'chan-raw';
+  pre.textContent = error ? 'ERROR: ' + error.message : JSON.stringify(data, null, 2);
+  chanList.replaceChildren(pre);
+  chanEmpty.hidden = true;
+}
 
   </script>
 </body>
