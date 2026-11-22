@@ -9285,6 +9285,7 @@ feedServer.load = async () => {
 };
 function renderMyWall(rows) {
   const wall = document.getElementById('pfWall');
+  loadChanAnnFeed();
   if (!rows.length) {
     const p = document.createElement('p');
     p.className = 'chat-empty';
@@ -9364,8 +9365,10 @@ async function loadChanAnn() {
     chanViewBody.replaceChildren(chanNote(t('chan.loadErr') + ': ' + error.message));
     return;
   }
-  const d = data || {};
-  const items = d.items || [];
+  const d = Array.isArray(data) ? { items: data } : (data || {});
+  const items = d.items || d.announcements || [];
+  if (!items.length) chanSay('[تشخيص] ' + JSON.stringify(data).slice(0, 300));
+  else chanSay('');
   const role = ['owner', 'manager'].includes(d.role) ? d.role : 'member';
   chanViewRole.textContent = t('chan.youAre') + ' ' + t('chan.role.' + role);
   chanCompose.hidden = !d.can_post;
@@ -9432,6 +9435,52 @@ function closeChanView() {
   openChansPage();
 }
 document.getElementById('chanBack').addEventListener('click', closeChanView);
+
+// إعلانات "للجميع" من القنوات التي يملكها المستخدم أو ينضم إليها (المتابعون) تظهر أعلى صفحته الشخصية
+async function loadChanAnnFeed() {
+  const { data: { user } } = await sbClient.auth.getUser();
+  if (!user) return;
+  const [owned, joined] = await Promise.all([
+    sbClient.from('chans').select('id,name,data').eq('owner', user.id),
+    sbClient.from('chan_members').select('chan_id').eq('user_id', user.id),
+  ]);
+  const chans = new Map((owned.data || []).map((c) => [c.id, c]));
+  const extra = (joined.data || []).map((r) => r.chan_id).filter((id) => !chans.has(id));
+  if (extra.length) {
+    const r = await sbClient.from('chans').select('id,name,data').in('id', extra);
+    (r.data || []).forEach((c) => chans.set(c.id, c));
+  }
+  // القنوات العامة فقط: قنوات النشر وقنوات النجوم. قنوات المؤسسات والروضة تبقى داخل قناتها
+  const publicChans = [...chans.values()].filter((c) => {
+    const d = c.data || {};
+    return d.type === 'pub' || d.kind === 'publish' || d.type === 'stars';
+  });
+  const lists = await Promise.all(publicChans.map(async (c) => {
+    const { data } = await sbClient.rpc('chan_ann_list', { p_chan: c.id });
+    const items = Array.isArray(data) ? data : ((data && (data.items || data.announcements)) || []);
+    return items.filter((a) => a.audience === 'all').map((a) => ({ ...a, chanName: c.name || '' }));
+  }));
+  const rows = lists.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 30);
+  const wall = document.getElementById('pfWall');
+  wall.querySelectorAll('.pf-chan-ann').forEach((el) => el.remove());
+  if (!rows.length) return;
+  wall.querySelectorAll('.chat-empty').forEach((el) => el.remove());
+  wall.prepend(...rows.map((a) => {
+    const card = document.createElement('article');
+    card.className = 'pf-post pf-chan-ann';
+    const tag = document.createElement('div');
+    tag.className = 'chan-ann-tag';
+    tag.textContent = '📢 ' + a.chanName;
+    const body = document.createElement('p');
+    body.textContent = a.body || '';
+    const when = document.createElement('small');
+    let d = '';
+    try { d = new Date(a.created_at).toLocaleString(); } catch (e) {}
+    when.textContent = (a.author_name || '') + ' · ' + d;
+    card.append(tag, body, when);
+    return card;
+  }));
+}
 
   </script>
 </body>
