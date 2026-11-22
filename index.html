@@ -22007,5 +22007,36 @@ html[data-th][data-th] #login #lgGo:active{transform:scale(.98)!important}
 html[data-th][data-th] #login div.card{position:relative!important}
 html[data-th][data-th] #login div.card::before{content:"";position:absolute;left:24px;right:24px;top:0;height:3px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,var(--acc,#ff3df2),var(--acc2,#7c1dff));box-shadow:0 0 12px var(--acc,#ff3df2);pointer-events:none}
 </style>
+<style>
+/* ===== شريط الكتابة (الحائط العام): بدون دوائر، الصوت والإرسال داخل الحقل، والإدارة داخل ＋ ===== */
+html body #comp{position:relative;gap:6px;align-items:center}
+html body #comp .rb{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;width:40px!important;height:40px!important;min-width:40px;padding:0!important;font-size:21px!important;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:inherit!important}
+html body #comp .rb:active{box-shadow:none!important;transform:scale(.92)}
+html body #comp #inp{order:2;flex:1 1 auto;min-width:0;height:42px;box-sizing:border-box;padding:0 44px;margin:0;border-radius:21px}
+html body #comp #giftBtn{order:3}
+html body #comp #plusAdm{order:1;font-size:26px!important;font-weight:700;color:#ff3df2!important;text-shadow:0 0 8px rgba(255,61,242,.7)}
+html body #comp #mic{position:absolute;left:62px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:34px!important;height:34px!important;font-size:17px!important;color:#22d3ee!important;text-shadow:0 0 6px rgba(34,211,238,.7)}
+html body #comp #mic.on{color:#f43f5e!important;text-shadow:0 0 8px #f43f5e}
+html body #comp #send{position:absolute;right:62px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:34px!important;height:34px!important;font-size:19px!important;color:#ff3df2!important;text-shadow:0 0 8px rgba(255,61,242,.8)}
+html body #comp #scBtn,html body #comp #wallImg{display:none!important}
+</style>
+<script>
+Object.assign(SV,{"أدوات": "Verktyg", "اختصارات": "Genvägar", "نشر صورة على الحائط": "Publicera bild på väggen"});Object.assign(TR,{"أدوات": "Araçlar", "اختصارات": "Kısayollar", "نشر صورة على الحائط": "Duvara resim paylaş"});
+/* ＋ في شريط الحائط: يجمع أدوات الإدارة (⚡ الاختصارات، 🖼 نشر صورة) ويستدعي الأزرار الأصلية */
+(function(){
+  var comp=document.getElementById('comp');if(!comp||document.getElementById('plusAdm'))return;
+  var b=document.createElement('button');b.type='button';b.className='rb';b.id='plusAdm';b.textContent='＋';
+  b.title=fl(_tx('أدوات'),'Tools');b.setAttribute('aria-label',fl(_tx('أدوات'),'Tools'));
+  comp.insertBefore(b,comp.firstChild);
+  b.onclick=function(){
+    var w=document.getElementById('wallImg'),canImg=!!w&&!w.hidden;
+    openSheet('<b>＋</b><div class="gg"><button data-p="s">⚡<small>'+fl(_tx('اختصارات'),'Shortcuts')+'</small></button>'+
+      (canImg?'<button data-p="i">🖼<small>'+fl(_tx('نشر صورة على الحائط'),'Post image to wall')+'</small></button>':'')+'</div>');
+    $('sheet').querySelectorAll('[data-p]').forEach(function(x){
+      x.onclick=function(){var k=x.dataset.p;closeSheet();setTimeout(function(){var t=document.getElementById(k==='s'?'scBtn':'wallImg');if(t)t.click()},60)};
+    });
+  };
+})();
+</script>
 </body>
 </html>
