@@ -22009,9 +22009,9 @@ html body #comp .rb:active{box-shadow:none!important;transform:scale(.92)}
 html body #comp #inp{order:2;flex:1 1 auto;min-width:0;height:42px;box-sizing:border-box;padding:0 44px;margin:0;border-radius:21px}
 html body #comp #giftBtn{order:3}
 html body #comp #plusAdm{order:1;font-size:26px!important;font-weight:700;color:#ff3df2!important;text-shadow:0 0 8px rgba(255,61,242,.7)}
-html body #comp #mic{position:absolute;left:62px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:34px!important;height:34px!important;font-size:17px!important;color:#22d3ee!important;text-shadow:0 0 6px rgba(34,211,238,.7)}
+html body #comp #mic{position:absolute;z-index:5;pointer-events:auto;left:62px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:34px!important;height:34px!important;font-size:17px!important;color:#22d3ee!important;text-shadow:0 0 6px rgba(34,211,238,.7)}
 html body #comp #mic.on{color:#f43f5e!important;text-shadow:0 0 8px #f43f5e}
-html body #comp #send{position:absolute;right:62px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:34px!important;height:34px!important;font-size:19px!important;color:#ff3df2!important;text-shadow:0 0 8px rgba(255,61,242,.8)}
+html body #comp #send{position:absolute;z-index:5;pointer-events:auto;right:62px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:34px!important;height:34px!important;font-size:19px!important;color:#ff3df2!important;text-shadow:0 0 8px rgba(255,61,242,.8)}
 html body #comp #scBtn,html body #comp #wallImg{display:none!important}
 </style>
 <script>
@@ -22034,8 +22034,8 @@ Object.assign(SV,{"أدوات": "Verktyg", "اختصارات": "Genvägar", "ن�
 </script>
 <style>
 /* ===== الشريط العلوي: أزرار بلا دوائر ===== */
-html body #app>.bar>button,html body #app>.bar>.chip,html body #conv .bar>button,html body #conv .bar>.chip,
-html[data-th] body #app>.bar>button,html[data-th] body #app>.bar>.chip,html[data-th] body #conv .bar>button,html[data-th] body #conv .bar>.chip{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;text-shadow:none!important;outline:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html body .bar>button::before,html body .bar>button::after,html body .bar>.chip::before,html body .bar>.chip::after,html[data-th] body .bar>button::before,html[data-th] body .bar>button::after,html[data-th] body .bar>.chip::before,html[data-th] body .bar>.chip::after,html[data-th] body #app .bar>button::before,html[data-th] body #app .bar>button::after{content:none!important;display:none!important;box-shadow:none!important;background:none!important}
+html body .bar>button,html body .bar>.chip,html body #app .bar>button,html body #app .bar>.chip,html[data-th] body .bar>button,html[data-th] body .bar>.chip,html[data-th] body #app .bar>button,html[data-th] body #app .bar>.chip,html[data-th] body #conv .bar>button,html[data-th] body #conv .bar>.chip,html[data-th] body #homeV .bar>button,html[data-th] body #homeV .bar>.chip{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;text-shadow:none!important;outline:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 </style>
 <script>
 /* ترجمات النصوص الجديدة */
