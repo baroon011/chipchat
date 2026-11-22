@@ -11282,7 +11282,7 @@ document.addEventListener('click',function(e){
     ctx.beginPath();ctx.arc(cx,cy,R*0.05,0,Math.PI*2);ctx.fillStyle='hsla(300,100%,85%,'+(0.35+beat*0.5).toFixed(3)+')';ctx.fill();
   }
 
-  var loginCv=null,chatCv=null,chatBtn=null;
+  var loginCv=null,chats=[];
   function mountLogin(){
     var img=document.querySelector('#login img.logo');
     if(!img||img.dataset.rose)return;
@@ -11293,27 +11293,31 @@ document.addEventListener('click',function(e){
     var mb=micBtn();mb.style.cssText+=';display:block;margin:4px auto 0';img.parentNode.insertBefore(mb,img.nextSibling);
     loginCv=cv;updateMicBtns();
   }
-  function mountChat(){
-    var m=document.getElementById('msgs');
+  // حائط الدردشة العامة: القائمة الرئيسية (#msgs) وداخل الغرفة (#cmsgs)
+  function mountChat(id){
+    var m=document.getElementById(id);
     if(!m||m.dataset.rose)return;
     m.dataset.rose='1';
     var parent=m.parentNode;
     if(getComputedStyle(parent).position==='static')parent.style.position='relative';
     m.style.position='relative';m.style.zIndex='1';
-    chatCv=document.createElement('canvas');chatCv.id='roseBg';
-    chatCv.style.cssText='position:absolute;pointer-events:none;z-index:0';
-    parent.insertBefore(chatCv,m);
-    chatBtn=micBtn();chatBtn.style.cssText+=';position:absolute;z-index:2;top:6px;left:6px';
-    parent.appendChild(chatBtn);
+    var cv=document.createElement('canvas');cv.className='roseBg';
+    cv.style.cssText='position:absolute;pointer-events:none;z-index:0';
+    parent.insertBefore(cv,m);
+    var btn=micBtn();btn.style.cssText+=';position:absolute;z-index:2';
+    parent.appendChild(btn);
+    chats.push({m:m,cv:cv,btn:btn});
     updateMicBtns();
   }
-  function placeChat(){
-    if(!chatCv)return;
-    var m=document.getElementById('msgs');if(!m||!m.offsetParent){chatCv.style.display='none';return}
-    chatCv.style.display='';
-    chatCv.style.left=m.offsetLeft+'px';chatCv.style.top=m.offsetTop+'px';
-    chatCv.style.width=m.offsetWidth+'px';chatCv.style.height=m.offsetHeight+'px';
-    if(chatBtn){chatBtn.style.top=(m.offsetTop+6)+'px';chatBtn.style.left=(m.offsetLeft+6)+'px'}
+  function placeChats(){
+    chats.forEach(function(c){
+      var m=c.m;
+      if(!m.offsetParent){c.cv.style.display='none';c.btn.style.display='none';return}
+      c.cv.style.display='';c.btn.style.display='';
+      c.cv.style.left=m.offsetLeft+'px';c.cv.style.top=m.offsetTop+'px';
+      c.cv.style.width=m.offsetWidth+'px';c.cv.style.height=m.offsetHeight+'px';
+      c.btn.style.left=(m.offsetLeft+6)+'px';c.btn.style.top=(m.offsetTop+6)+'px';
+    });
   }
   function frame(now){
     raf=requestAnimationFrame(frame);
@@ -11323,18 +11327,19 @@ document.addEventListener('click',function(e){
       var r=loginCv.getBoundingClientRect();
       if(r.width){var dpr=Math.min(2,window.devicePixelRatio||1);
         if(loginCv.width!==Math.round(r.width*dpr)){loginCv.width=Math.round(r.width*dpr);loginCv.height=loginCv.width}
-        var c1=loginCv.getContext('2d');c1.setTransform(dpr*loginCv.width/(r.width*dpr),0,0,dpr*loginCv.width/(r.width*dpr),0,0);
+        var c1=loginCv.getContext('2d');c1.setTransform(loginCv.width/r.width,0,0,loginCv.width/r.width,0,0);
         drawRose(c1,r.width,r.width,1,true);}
     }
-    if(chatCv&&chatCv.style.display!=='none'&&chatCv.offsetWidth){
-      var w=chatCv.offsetWidth,h=chatCv.offsetHeight,dp=Math.min(2,window.devicePixelRatio||1);
-      if(chatCv.width!==Math.round(w*dp)||chatCv.height!==Math.round(h*dp)){chatCv.width=Math.round(w*dp);chatCv.height=Math.round(h*dp)}
-      var c2=chatCv.getContext('2d');c2.setTransform(dp,0,0,dp,0,0);
-      drawRose(c2,w,h,0.32);
-    }
+    chats.forEach(function(c){
+      if(c.cv.style.display==='none'||!c.cv.offsetWidth)return;
+      var w=c.cv.offsetWidth,h=c.cv.offsetHeight,dp=Math.min(2,window.devicePixelRatio||1);
+      if(c.cv.width!==Math.round(w*dp)||c.cv.height!==Math.round(h*dp)){c.cv.width=Math.round(w*dp);c.cv.height=Math.round(h*dp)}
+      var ctx2=c.cv.getContext('2d');ctx2.setTransform(dp,0,0,dp,0,0);
+      drawRose(ctx2,w,h,0.32);
+    });
   }
-  window.addEventListener('resize',placeChat);
-  setInterval(function(){try{mountLogin();mountChat();placeChat()}catch(e){}},700);
+  window.addEventListener('resize',placeChats);
+  setInterval(function(){try{mountLogin();mountChat('msgs');mountChat('cmsgs');placeChats()}catch(e){}},700);
   requestAnimationFrame(frame);
 })();
 
