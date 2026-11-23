@@ -5422,7 +5422,7 @@ const PACKS = [
   { coins: 3000, price: 25 },
 ];
 
-function initChat({ onSend = () => {}, onAudioGift = () => {}, onAuthor = () => {} } = {}) {
+function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () => {}, onAuthor = () => {} } = {}) {
   const $ = (id) => document.getElementById(id);
   const list = $('chatList');
   const form = $('chatForm');
@@ -5723,9 +5723,9 @@ function initChat({ onSend = () => {}, onAudioGift = () => {}, onAuthor = () => 
   mediaBtn.addEventListener('click', () => mediaFile.click());
   mediaFile.addEventListener('change', (e) => {
     const f = e.target.files[0];
-    if (!f) return;
-    addMessage(f.name, 'chat-msg-media');
     e.target.value = '';
+    if (!f) return;
+    onSendMedia(f);
   });
 
   renderCoins();
@@ -5743,6 +5743,8 @@ function initChat({ onSend = () => {}, onAudioGift = () => {}, onAuthor = () => 
         img.src = imgUrl;
         img.alt = '';
         img.className = 'dm-media';
+        // إن تعذر عرض الصورة نخفيها بدل أن تبقى أيقونة الصورة المكسورة
+        img.onerror = () => { console.warn('chat image failed to load'); img.remove(); };
         list.lastElementChild.append(img);
       }
     },
@@ -10289,7 +10291,7 @@ function openRoom(id) {
 }
 
 // الدردشة العامة: الإرسال الحقيقي هيتربط بالـ Supabase
-const chat = initChat({ onSend: (text) => publicSend(text), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
+const chat = initChat({ onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
 
 // الدور مؤقتاً من الرابط (?role=admin) للعرض بس. الصلاحية الحقيقية من السيرفر (RLS) لاحقاً
 const isAdmin = true;
@@ -12147,14 +12149,17 @@ const PUBLIC_ROOM = 'general';
 let pubMyId = null;
 let pubStarted = false;
 // رابط صورة في الدردشة العامة: نفس طريقة القديم (chat_media_get ثم تنزيل من chatmedia)
-async function chatMediaUrl(rid) {
+async function chatMediaUrl(rid, mime) {
   try {
     const r = await sbClient.rpc('chat_media_get', { mid: rid });
     const d = r.data && r.data[0];
     if (r.error || !d) return null;
     const dl = await sbClient.storage.from('chatmedia').download(d.path);
     if (dl.error || !dl.data) return null;
-    return URL.createObjectURL(dl.data);
+    // نضبط نوع الملف حتى يعرضه المتصفح كصورة إن جاء بنوع عام
+    const type = /^image\//.test(dl.data.type) ? dl.data.type : (mime && /^image\//.test(mime) ? mime : '');
+    const blob = type ? new Blob([dl.data], { type }) : dl.data;
+    return URL.createObjectURL(blob);
   } catch (e) {
     return null;
   }
@@ -12164,8 +12169,8 @@ async function publicShow(r, self) {
   const mv = r.meta && r.meta.x && r.meta.x.media;
   const name = r.nick || '?';
   if (mv && mv.rid) {
-    const isImg = /image/.test(String(mv.kind || mv.mime || ''));
-    const url = isImg ? await chatMediaUrl(mv.rid) : null;
+    const isImg = /image/.test(String(mv.kind || mv.mime || '')) || /\.(png|jpe?g|gif|webp|avif|heic|bmp)$/i.test(String(mv.name || ''));
+    const url = isImg ? await chatMediaUrl(mv.rid, mv.mime) : null;
     if (url) chat.addRemote('', name, self, url);
     else chat.addRemote('📎 ' + (mv.name || ''), name, self);
     return;
@@ -12247,6 +12252,26 @@ async function dmStart() {
     })
     .subscribe();
 }
+// إرسال صورة أو فيديو أو مقطع في الدردشة العامة: رفع إلى chatmedia ثم تسجيل الملف ثم رسالة تشير إليه (نفس شكل القديم)
+async function publicSendMedia(file) {
+  try {
+    if (!pubMyId) { const { data: { user } } = await sbClient.auth.getUser(); pubMyId = user && user.id; }
+    if (!pubMyId) return;
+    const ext = ((file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'bin';
+    const path = pubMyId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const up = await sbClient.storage.from('chatmedia').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (up.error) { chat.addSystem(t('chat.sendFailed')); return; }
+    const kind = /^video\//.test(file.type) ? 'video' : (/^audio\//.test(file.type) ? 'audio' : (/^image\//.test(file.type) ? 'image' : 'file'));
+    const a = await sbClient.rpc('chat_media_add', { rm: PUBLIC_ROOM, pth: path, kd: kind, mm: file.type || 'application/octet-stream', sz: file.size });
+    if (a.error || !a.data) { chat.addSystem(t('chat.sendFailed')); return; }
+    const media = { rid: a.data, kind, mime: file.type || '', name: file.name };
+    const { error } = await sbClient.from('messages').insert({ room: PUBLIC_ROOM, kind: 'media', text: '', meta: { x: { media } } });
+    if (error) chat.addSystem(t('chat.sendFailed'));
+  } catch (e) {
+    chat.addSystem(t('chat.sendFailed'));
+  }
+}
+
 async function publicSend(text) {
   const { error } = await sbClient.from('messages').insert({ room: PUBLIC_ROOM, kind: 'text', text: String(text).slice(0, 2000), meta: {} });
   if (error) chat.addSystem(t('chat.sendFailed'));
@@ -12257,6 +12282,7 @@ function startMusicRealtime() {
   if (musicRealtimeOn) return;
   musicRealtimeOn = true;
   publicStart();
+  startPresence();
   sbClient.channel('music')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'music_queue' }, pullMusicServer)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'music_state' }, pullMusicServer)
@@ -12468,17 +12494,42 @@ function paintPresence(avatarEl, status) {
   dot.style.background = presColor(status);
   dot.title = presLabel(status);
 }
+// الحضور الفعلي: من فيه التطبيق الآن عبر Realtime Presence. الحالة المحفوظة (profiles.status) تظهر فقط للمتصلين فعلاً
+const onlineIds = new Set();
+let presenceStarted = false;
+const presWatch = new Map();   // عنصر النص -> { id, av } لتحديث النوافذ المفتوحة عند تغيّر الحضور
+function startPresence() {
+  if (presenceStarted) return;
+  presenceStarted = true;
+  sbClient.auth.getUser().then(({ data: { user } }) => {
+    if (!user) return;
+    const ch = sbClient.channel('online-users', { config: { presence: { key: user.id } } });
+    ch.on('presence', { event: 'sync' }, () => {
+      onlineIds.clear();
+      Object.keys(ch.presenceState()).forEach((k) => onlineIds.add(k));
+      presWatch.forEach((v, el) => { if (el.isConnected) paintWatch(el, v.id, v.av); else presWatch.delete(el); });
+    });
+    ch.subscribe(async (st) => { if (st === 'SUBSCRIBED') await ch.track({ at: Date.now() }); });
+  }).catch(() => {});
+}
 async function fetchStatus(id) {
   if (!isUuid(id)) return 'off';
   const { data } = await sbClient.from('profiles').select('status').eq('id', id).maybeSingle();
-  return (data && data.status) || 'off';
+  const stored = (data && data.status) || 'off';
+  // غير متصل فعلياً = غير متصل مهما كانت الحالة المحفوظة
+  if (stored === 'off' || !onlineIds.has(id)) return 'off';
+  return stored;
 }
-// نافذة المحادثة: الحالة تحت الاسم
-dm.setPresence(async (id, el, av) => {
+async function paintWatch(el, id, av) {
   const s = await fetchStatus(id);
   el.textContent = presLabel(s);
   el.style.color = presColor(s);
   paintPresence(av, s);
+}
+// نافذة المحادثة: الحالة تحت الاسم ونقطة على الصورة، وتتحدث مع تغيّر الحضور
+dm.setPresence(async (id, el, av) => {
+  presWatch.set(el, { id, av });
+  await paintWatch(el, id, av);
 });
 // صفحة الشخص: نقطة على الصورة ونص الحالة
 const origLoadPersonPage = loadPersonPage;
