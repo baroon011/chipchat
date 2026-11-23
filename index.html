@@ -2529,6 +2529,29 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 }
 .dm-ctx-x { background: none; border: 0; font: 700 18px var(--font); color: var(--ink); cursor: pointer; }
 
+/* مقبض المصغرات: صغير وهادئ، يخفت تلقائياً (بألوان الثيم) */
+.dm-bubbles { transition: opacity .4s ease; }
+.dm-bubbles.faded { opacity: 0; }
+.dm-handle {
+  width: 30px;
+  height: 58px;
+  flex: 0 0 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 29px 0 0 29px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+  cursor: pointer;
+}
+.dm-handle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dm-handle .dm-bubble-count { font: 800 12px var(--font); color: var(--ink); }
+
 /* المنشورات والتعليقات: نفس شكل التطبيق القديم، بألوان الثيم الحالي */
 .feed-view { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px 24px; }
 .feed-list { display: flex; flex-direction: column; gap: 10px; }
@@ -2611,6 +2634,32 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 .feed-x { height: 22px; padding: 0 8px; font-size: 10px; }
 
 .msg-time { display: block; font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.ppAv img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.ppAv { overflow: hidden; }
+
+/* الحائط العام في الرئيسية: نفس التصميم المعتمد للصفحة الشخصية، منشورات مباشرة بفاصل رفيع */
+#feedList { gap: 0; }
+#feedList .ppCard {
+  padding: 14px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+#feedList .ppCard:last-child { border-bottom: 0; }
+
+/* خيط نيون حول الوسائط والمنشورات النصية، بلون الثيم المستخدم */
+#pfWall .ppCard :is(img, video):not(.ppAv img),
+#feedList .ppCard :is(img, video):not(.ppAv img) {
+  border-radius: 14px;
+  box-shadow: 0 0 0 1.5px var(--pink), 0 0 12px 1px color-mix(in srgb, var(--pink) 60%, transparent);
+}
+#pfWall .ppTx,
+#feedList .ppTx {
+  padding: 12px 14px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1.5px var(--pink), 0 0 12px 1px color-mix(in srgb, var(--pink) 55%, transparent);
+}
 
 /* الإعدادات واكتشف: قوائم الإعدادات، حالة الاتصال، زر كن نجماً */
 /* الملف الشخصي فوق الإعدادات عشان زر صاحب الصفحة يفتحه وزر الرجوع يرجع للإعدادات */
@@ -2999,7 +3048,7 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 .pf-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 14px; }
 .pf-stat {
   display: grid; justify-items: center; gap: 4px; padding: 14px 6px; border: 0; border-radius: 18px; cursor: pointer;
-  color: #1a0b33; background: var(--surface, #fff); box-shadow: 0 4px 14px rgba(124, 29, 255, .12);
+  color: var(--ink); background: var(--surface); box-shadow: 0 4px 14px rgba(124, 29, 255, .12);
 }
 .pf-stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
 .pf-stat small { font-size: 12px; opacity: .75; }
@@ -3104,6 +3153,8 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
   background: transparent;
 }
 #pfWall .ppCard:last-child { border-bottom: 0; }
+.st-slot:empty { display: none; }
+.st-slot { display: flex; flex-direction: column; gap: 8px; }
 
   </style>
 </head>
@@ -3667,12 +3718,14 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
                 <div class="st-card">
           <h3 class="st-title" data-i18n="settings.privacy"></h3>
           <label class="st-switch"><span data-i18n="settings.lockPrivate"></span><input type="checkbox" data-field="lockPrivate"></label>
+          <div id="stLockSlot" class="st-slot"></div>
           <label class="st-label" data-i18n="settings.profileVisibility"></label>
           <div class="st-seg" data-field="profile" data-value="hidden">
             <button type="button" data-value="hidden" aria-pressed="true" data-i18n="settings.hidden"></button>
             <button type="button" data-value="visible" aria-pressed="false" data-i18n="settings.visibleAll"></button>
           </div>
           <button class="st-btn" type="button" data-save="privacy" data-i18n="settings.saveVisibility"></button>
+          <div id="stStatusSlot" class="st-slot"></div>
         </div>
 
         <div class="st-card">
@@ -6418,12 +6471,24 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {} } = {}
     return b;
   }
 
+  // المقبض يخفت تلقائياً بعد ثانيتين ونصف من دون لمس، ويعود عند النقر على حافته
+  let fadeT = 0;
+  function armFade(col) {
+    const show = () => {
+      col.classList.remove('faded');
+      clearTimeout(fadeT);
+      fadeT = setTimeout(() => col.classList.add('faded'), 2500);
+    };
+    show();
+    col.addEventListener('pointerdown', show);
+  }
+
   function buildGroup(count) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'dm-bubble dm-group';
+    b.className = 'dm-handle';
     b.setAttribute('aria-label', t('dm.openChats'));
-    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="dm-bubble-count">${count}</span>`;
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span class="dm-bubble-count">${count}</span>`;
     b.addEventListener('click', () => {
       expanded = !expanded;
       render();
@@ -6446,6 +6511,7 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {} } = {}
       col.append(buildBubble(mins[0]));
     } else {
       col.append(buildGroup(mins.length));
+      if (!expanded) armFade(col);
       if (expanded) mins.forEach((w) => col.append(buildBubble(w)));
     }
     stage.append(col);
@@ -6564,7 +6630,9 @@ let feedList = null;
 let wallList = null;
 
 const feedUid = (p) => `${p}${Date.now().toString(36)}${(feedSeq++).toString(36)}`;
-const feedName = (n) => (n === FEED_ME ? t('feed.me') : n);
+// بيانات حسابي الحقيقية (من applyMeProfile): الاسم والصورة لمنشوراتي
+const feedMe = { nick: '', avatar: '' };
+const feedName = (n) => (n === FEED_ME ? (feedMe.nick || t('feed.me')) : n);
 const feedText = (x) => (x.textKey ? t(x.textKey) : x.text);
 function feedColor(n) {
   let h = 0;
@@ -6677,6 +6745,13 @@ function feedPostEl(p) {
   const hd = feedMk('div', 'ppHd');
   const av = feedMk('span', 'ppAv', feedName(p.nick).slice(0, 1));
   av.style.setProperty('--c', feedColor(p.nick));
+  if (p.nick === FEED_ME && feedMe.avatar) {
+    av.textContent = '';
+    const im = document.createElement('img');
+    im.alt = '';
+    im.src = feedMe.avatar;
+    av.append(im);
+  }
   hd.append(av, feedMk('span', '', `${feedName(p.nick)} • ${timeAgo(p.at)}`));
   card.append(hd);
 
@@ -11445,6 +11520,7 @@ let myNickVal = '';
 function applyMeProfile(nick, avatar) {
   if (nick) {
     myNickVal = nick;
+    feedMe.nick = nick;
     document.querySelectorAll('.me-name').forEach((el) => {
       el.removeAttribute('data-i18n');
       el.textContent = nick;
@@ -11453,6 +11529,7 @@ function applyMeProfile(nick, avatar) {
     if (pfNameEl) pfNameEl.textContent = nick;
   }
   if (avatar) {
+    feedMe.avatar = avatar;
     const pfImg = document.getElementById('pfAvatarImg');
     if (pfImg) pfImg.src = avatar;
     const av = document.querySelector('.me .avatar');
@@ -11787,8 +11864,8 @@ async function loadPersonPage(person) {
 
 // زر قفل الملف في صفحتي: يخفي التفاصيل عن غير الأصدقاء
 async function renderLockBtn() {
-  const name = document.getElementById('pfName');
-  if (!name) return;
+  const slot = document.getElementById('stLockSlot');
+  if (!slot) return;
   let b = document.getElementById('pfLockBtn');
   if (!b) {
     b = document.createElement('button');
@@ -11796,7 +11873,7 @@ async function renderLockBtn() {
     b.type = 'button';
     b.className = 'app-save';
     b.addEventListener('click', toggleLock);
-    name.after(b);
+    slot.append(b);
   }
   const r = await sbClient.rpc('get_profile_lock');
   b.dataset.on = (!r.error && r.data) ? '1' : '0';
@@ -11857,8 +11934,8 @@ loadPersonPage = async function (person) {
 };
 // حالتي: زر في صفحتي يختار الحالة
 async function renderMyStatusBtn() {
-  const name = document.getElementById('pfName');
-  if (!name) return;
+  const slot = document.getElementById('stStatusSlot');
+  if (!slot) return;
   let b = document.getElementById('pfStatusBtn');
   if (!b) {
     b = document.createElement('button');
@@ -11866,7 +11943,7 @@ async function renderMyStatusBtn() {
     b.type = 'button';
     b.className = 'app-save';
     b.addEventListener('click', openMyStatus);
-    name.after(b);
+    slot.append(b);
   }
   const { data: { user } } = await sbClient.auth.getUser();
   const s = user ? await fetchStatus(user.id) : 'off';
