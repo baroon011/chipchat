@@ -2452,6 +2452,12 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 .chan-compose-wrap { padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px); }
 .chan-compose { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chan-compose[hidden] { display: none; }
+.chan-post-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-inline-start: auto; border: 0; border-radius: 50%; color: #fff; background: var(--purple); box-shadow: none; cursor: pointer; }
+.chan-post-btn svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; }
+.chan-post-btn[hidden] { display: none; }
+.chan-sheet-form { display: grid; gap: 10px; }
+.chan-sheet-form textarea { font: inherit; font-size: 16px; border: 2px solid #c03fd8; border-radius: 14px; padding: 8px 12px; resize: none; box-sizing: border-box; min-height: 110px; width: 100%; }
+.chan-sheet-form select { border-radius: 999px; padding: 8px 10px; font: inherit; border: 2px solid #c03fd8; }
 .chan-compose textarea { flex: 1 1 100%; font: inherit; font-size: 16px; border: 2px solid #c03fd8; border-radius: 14px; padding: 8px 12px; resize: none; box-sizing: border-box; }
 .chan-compose select { flex: 1; min-width: 0; border-radius: 999px; padding: 8px 10px; font: inherit; border: 2px solid #c03fd8; }
 .chan-send { border: 0; border-radius: 999px; padding: 10px 20px; color: #fff; font: 700 15px var(--font); background: linear-gradient(90deg, var(--pink), var(--purple)); cursor: pointer; }
@@ -2693,6 +2699,17 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 }
 #pfWall .ppTx,
 #feedList .ppTx {
+  padding: 12px 14px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 55%, transparent);
+}
+
+/* خيط النيون نفسه لمنشورات الصفحة الشخصية */
+.pv-posts .ppCard :is(img, video):not(.ppAv img) {
+  border-radius: 14px;
+  box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 60%, transparent);
+}
+.pv-posts .ppTx {
   padding: 12px 14px;
   border-radius: 14px;
   box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 55%, transparent);
@@ -3561,6 +3578,7 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
       <div class="inst-body" id="chanViewBody"></div>
       <footer class="chan-compose-wrap">
         <p class="auth-msg" id="chanMsg" role="status"></p>
+        <button class="chan-post-btn" id="chanPostBtn" type="button" hidden data-i18n-aria="chan.post"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
         <form class="chan-compose" id="chanCompose" hidden>
           <textarea id="chanAnnText" rows="2" maxlength="500" data-i18n-placeholder="chan.placeholder" aria-label="chan.placeholder"></textarea>
           <select id="chanAnnAud" aria-label="chan.newAnn">
@@ -6742,9 +6760,11 @@ function feedBtn(cls, label, data = {}) {
 const feedToggle = (set, id) => (set.has(id) ? set.delete(id) : set.add(id));
 
 
+// منشورات الصفحات الشخصية: لا تدخل قائمة الرئيسية، لكن أزرار الإعجاب والتعليق تعمل عليها
+const feedSide = new Map();
 function feedFind(kind, id) {
-  if (kind === 'post') return feedPosts.find((p) => p.id === id) || null;
-  for (const p of feedPosts) {
+  if (kind === 'post') return feedPosts.find((p) => p.id === id) || feedSide.get(id) || null;
+  for (const p of [...feedPosts, ...feedSide.values()]) {
     const c = p.comments.find((x) => x.id === id);
     if (c) return c;
   }
@@ -7206,6 +7226,29 @@ function initWall(root) {
   root.append(wallList);
   wallList.addEventListener('click', feedClick);
   feedRender();
+}
+
+// بطاقة منشور كما في الرئيسية (إعجاب، تعليقات، مشاركة) لمنشور من صفحة شخص
+function feedCardFor(r, myUid) {
+  const mine = !!myUid && r.user_id === myUid;
+  let p = feedSide.get(r.id);
+  if (!p) {
+    p = {
+      id: r.id,
+      nick: mine ? FEED_ME : (r.nick || ''),
+      wall: mine ? FEED_ME : (r.nick || ''),
+      text: r.body || '',
+      at: new Date(r.created_at).getTime(),
+      likes: r.lk || 0,
+      dislikes: 0,
+      mine: r.mine || 0,
+      media: r.media || [],
+      comments: [],
+      cLoaded: false,
+    };
+    feedSide.set(r.id, p);
+  }
+  return feedPostEl(p);
 }
 
 const feedServer = {
@@ -10765,7 +10808,45 @@ const chanCompose = document.getElementById('chanCompose');
 const chanAnnText = document.getElementById('chanAnnText');
 const chanAnnAud = document.getElementById('chanAnnAud');
 const chanMsg = document.getElementById('chanMsg');
+const chanPostBtn = document.getElementById('chanPostBtn');
 let currentChan = null;
+// نشر إعلان: زر واحد يفتح نافذة الكتابة، فلا يغطي حقل الكتابة الدائم القنوات
+function openChanPostSheet() {
+  if (!currentChan) return;
+  const wrap = document.createElement('form');
+  wrap.className = 'chan-sheet-form';
+  const ta = document.createElement('textarea');
+  ta.rows = 4;
+  ta.maxLength = 500;
+  ta.placeholder = t('chan.placeholder');
+  const sel = document.createElement('select');
+  [['all', 'chan.audAll'], ['staff', 'chan.audStaff']].forEach(([v, k]) => {
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = t(k);
+    sel.append(o);
+  });
+  const send = document.createElement('button');
+  send.type = 'submit';
+  send.className = 'chan-send';
+  send.textContent = t('chan.post');
+  const msg = document.createElement('p');
+  msg.className = 'auth-msg';
+  wrap.append(ta, sel, send, msg);
+  wrap.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = ta.value.trim();
+    if (!text || !currentChan) return;
+    send.disabled = true;
+    const r = await sbClient.rpc('chan_ann_post', { p_chan: currentChan.id, p_body: text, p_aud: sel.value });
+    send.disabled = false;
+    if (r.error) { msg.textContent = t('chan.postErr') + ': ' + r.error.message; return; }
+    appSettings.close();
+    loadChanAnn();
+  });
+  appSettings.openSheet(t('chan.post'), wrap);
+}
+chanPostBtn.addEventListener('click', openChanPostSheet);
 function chanSay(msg) { chanMsg.textContent = msg || ''; }
 function chanNote(text) {
   const p = document.createElement('p');
@@ -10787,7 +10868,8 @@ async function loadChanAnn() {
   chanSay('');
   const role = ['owner', 'manager'].includes(d.role) ? d.role : 'member';
   chanViewRole.textContent = t('chan.youAre') + ' ' + t('chan.role.' + role);
-  chanCompose.hidden = !d.can_post;
+  chanCompose.hidden = true;
+  chanPostBtn.hidden = !d.can_post;
   if (currentChan.kind === 'commercial') chanOrderStrip();
   const nodes = items.map((a) => {
     const card = document.createElement('div');
@@ -12339,6 +12421,9 @@ function pvNote(text) {
 }
 
 function pvPostCard(r) {
+  return feedCardFor(r, pfUid);
+}
+function pvPostCardOld(r) {
   const card = document.createElement('article');
   card.className = 'pf-post';
   const body = document.createElement('p');
