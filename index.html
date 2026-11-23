@@ -7341,6 +7341,9 @@ function musicAudioEl() {
 // تحليل الصوت عشان الأمواج تتراقص مع الموسيقى
 function musicGraph() {
   if (musicCtx) return;
+  // سياق الصوت الذي يُنشأ قبل أي لمسة يبدأ معلّقاً، وصوت المقطع يمر منه فيصير صامتاً:
+  // لا نبنيه إلا بعد أول تفاعل من المستخدم
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     musicCtx = new AC();
@@ -7350,6 +7353,7 @@ function musicGraph() {
     musicData = new Uint8Array(musicAnalyser.frequencyBinCount);
     src.connect(musicAnalyser);
     musicAnalyser.connect(musicCtx.destination);
+    musicCtx.resume().catch(() => {});
   } catch (e) {
     // لو المتصفح ما يسمحش بالتحليل، الأمواج بتتحرك بشكل ثابت
     musicCtx = null;
@@ -7769,6 +7773,14 @@ function initMusic({ openSheet, openSettings }) {
     },
   };
 }
+
+// أول لمسة في أي مكان: نبني سياق الصوت ونشغّله (كما يفعل التطبيق القديم)
+['pointerdown', 'keydown', 'touchstart'].forEach((ev) => {
+  document.addEventListener(ev, () => {
+    if (!musicCtx) musicGraph();
+    if (musicCtx && musicCtx.state === 'suspended') musicCtx.resume().catch(() => {});
+  }, { capture: true, passive: true });
+});
 
 // الوردة الراقصة: نفس تصميم غلاف الصفحة الشخصية في التطبيق القديم، تظهر في وسط حائط الدردشة العامة
 // وتتأثر بصوت الموسيقى المشغّلة. الخلفية شفافة وخفيفة حتى لا تؤثر على قراءة الرسائل.
