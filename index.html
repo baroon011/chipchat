@@ -2495,6 +2495,9 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 #discRes { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .pres-dot { position: absolute; bottom: 0; inset-inline-end: 0; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; }
+/* بطاقة الشخص وقائمة الاتصال تظهران فوق نافذة المحادثة الخاصة لا خلفها */
+#personView { z-index: 27; }
+#personMenu { z-index: 28; }
 .dmw-st { display: block; font-size: 11px; color: #6b5b85; font-weight: 400; }
 .pm-title { margin: 6px 12px 10px; font-weight: 700; color: #1a0b33; text-align: center; }
 
@@ -6113,7 +6116,11 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onSen
     name.addEventListener('click', () => openPersonMenu({ id: w.id, name: w.name }, { fromDm: true }));
     const stLine = document.createElement('small');
     stLine.className = 'dmw-st';
-    if (dmPresence) dmPresence(w.id, stLine);
+    // الصورة والاسم يفتحان بطاقة الشخص داخل نفس الشاشة
+    const headAv = avatarEl(w.name, w.avatar);
+    headAv.style.cursor = 'pointer';
+    headAv.addEventListener('click', () => openPersonMenu({ id: w.id, name: w.name }, { fromDm: true }));
+    if (dmPresence) dmPresence(w.id, stLine, headAv);
     name.append(stLine);
     const minBtn = document.createElement('button');
     minBtn.type = 'button';
@@ -6140,7 +6147,7 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onSen
     closeBtn.setAttribute('aria-label', t('dm.close'));
     closeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     closeBtn.addEventListener('click', () => closeWindow(w.id));
-    head.append(avatarEl(w.name, w.avatar), name, callBtn(false), callBtn(true), minBtn, closeBtn);
+    head.append(headAv, name, callBtn(false), callBtn(true), minBtn, closeBtn);
 
     const log = document.createElement('div');
     log.className = 'dmw-log';
@@ -10008,10 +10015,12 @@ const discover = initDiscover({
     discover.close();
     goPublic(id);
   },
-  onStar: () => {
-    // كن نجماً: إن كانت لديك قناة نجوم تفتح مباشرة، وإلا تفتح شراء قناة النجوم
-    const star = myChannels.find((c) => c.type === 'stars' && c.role === 'owner');
+  onStar: async () => {
+    // كن نجماً: قناة النجوم المجانية تُنشأ لكل مستخدم تلقائياً، فنتأكد من وجودها ثم نفتحها
     discover.close();
+    await ensureStarChan();
+    await loadMyChannels();
+    const star = myChannels.find((c) => c.type === 'stars' && c.role === 'owner');
     if (star) openChanView(star);
     else openShop('stars');
   },
@@ -10125,6 +10134,7 @@ function renderChans() {
     return row;
   }));
   chanEmpty.hidden = myChannels.length > 0;
+  document.getElementById('pfNCh').textContent = String(myChannels.length);
 }
 function openChansPage() {
   renderChans();
@@ -10711,9 +10721,20 @@ async function showChannelsRaw() {
 }
 
 // قنواتي: القنوات التي يملكها المستخدم، والقنوات التي انضم إليها كعضو (من جدولي chans و chan_members)
+// قناة النجوم المجانية: يطلب الخادم إنشاءها إن لم تكن موجودة (idempotent)
+async function ensureStarChan() {
+  try {
+    const { data: { user } } = await sbClient.auth.getUser();
+    if (!user) return;
+    const { data: prof } = await sbClient.from('profiles').select('nick').eq('id', user.id).maybeSingle();
+    await sbClient.rpc('stars_free_ensure', { p_uid: user.id, p_nick: (prof && prof.nick) || '' });
+  } catch (e) { /* الزر يبقى يعمل حتى لو تعذر الإنشاء */ }
+}
+
 async function loadMyChannels() {
   const { data: { user } } = await sbClient.auth.getUser();
   if (!user) return;
+  await ensureStarChan();
   const [owned, joined] = await Promise.all([
     sbClient.from('chans').select('id,name,icon,owner,data,code').eq('owner', user.id),
     sbClient.from('chan_members').select('chan_id').eq('user_id', user.id),
@@ -10945,6 +10966,7 @@ async function loadChanAnnFeed() {
     return items.filter((a) => a.audience === 'all').map((a) => ({ ...a, chanName: c.name || '' }));
   }));
   const rows = lists.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 30);
+  document.getElementById('pfNNews').textContent = String(lists.flat().length);
   const wall = document.getElementById('pfWall');
   wall.querySelectorAll('.pf-chan-ann').forEach((el) => el.remove());
   if (!rows.length) return;
@@ -12452,9 +12474,11 @@ async function fetchStatus(id) {
   return (data && data.status) || 'off';
 }
 // نافذة المحادثة: الحالة تحت الاسم
-dm.setPresence(async (id, el) => {
+dm.setPresence(async (id, el, av) => {
   const s = await fetchStatus(id);
   el.textContent = presLabel(s);
+  el.style.color = presColor(s);
+  paintPresence(av, s);
 });
 // صفحة الشخص: نقطة على الصورة ونص الحالة
 const origLoadPersonPage = loadPersonPage;
