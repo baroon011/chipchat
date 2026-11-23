@@ -5733,8 +5733,15 @@ function initChat({ onSend = () => {}, onAudioGift = () => {}, onAuthor = () => 
       mediaBtn.hidden = !on;
     },
     // رسالة واردة من شخص آخر (أو من حسابي عند التحميل)
-    addRemote(text, name, self) {
+    addRemote(text, name, self, imgUrl) {
       addMessage(text, '', { id: self ? 'me' : 'u', name, self: !!self });
+      if (imgUrl) {
+        const img = document.createElement('img');
+        img.src = imgUrl;
+        img.alt = '';
+        img.className = 'dm-media';
+        list.lastElementChild.append(img);
+      }
     },
     // رسالة من النظام في الدردشة (طرد، حظر، نقل...)
     addSystem(text) {
@@ -12117,6 +12124,45 @@ music.setServerHooks({ publish: uploadMusicTrack, remove: removeMusicTrack });
 const PUBLIC_ROOM = 'general';
 let pubMyId = null;
 let pubStarted = false;
+// رابط صورة في الدردشة العامة: نفس طريقة القديم (chat_media_get ثم تنزيل من chatmedia)
+async function chatMediaUrl(rid) {
+  try {
+    const r = await sbClient.rpc('chat_media_get', { mid: rid });
+    const d = r.data && r.data[0];
+    if (r.error || !d) return null;
+    const dl = await sbClient.storage.from('chatmedia').download(d.path);
+    if (dl.error || !dl.data) return null;
+    return URL.createObjectURL(dl.data);
+  } catch (e) {
+    return null;
+  }
+}
+// عرض رسالة عامة: نص، أو صورة إن كانت وسائطها صورة
+async function publicShow(r, self) {
+  const mv = r.meta && r.meta.x && r.meta.x.media;
+  const name = r.nick || '?';
+  if (mv && mv.rid) {
+    const isImg = /image/.test(String(mv.kind || mv.mime || ''));
+    const url = isImg ? await chatMediaUrl(mv.rid) : null;
+    if (url) chat.addRemote('', name, self, url);
+    else chat.addRemote('📎 ' + (mv.name || ''), name, self);
+    return;
+  }
+  if (r.text) chat.addRemote(r.text, name, self);
+}
+
+// صندوق البريد: آخر رسالة من كل محادثة خاصة
+const dmThreads = {};
+function dmPushInbox(other, name, text, at) {
+  const cur = dmThreads[other] || { id: other, name: '', preview: '', time: '', unread: 0, at: 0 };
+  if (name) cur.name = name;
+  cur.preview = text || '';
+  cur.at = at || Date.now();
+  cur.time = timeAgo(new Date(cur.at).toISOString());
+  dmThreads[other] = cur;
+  dm.setItems(Object.values(dmThreads).sort((a, b) => b.at - a.at));
+}
+
 async function publicStart() {
   if (pubStarted) return;
   pubStarted = true;
@@ -12125,13 +12171,13 @@ async function publicStart() {
     pubMyId = user ? user.id : null;
     dmStart();
     const { data } = await sbClient.from('messages').select('*').eq('room', PUBLIC_ROOM).order('created_at', { ascending: false }).limit(50);
-    (data || []).reverse().forEach((r) => chat.addRemote(r.text || '', r.nick || '?', !!pubMyId && r.user_id === pubMyId));
+    for (const r of (data || []).reverse()) await publicShow(r, !!pubMyId && r.user_id === pubMyId);
   } catch (e) {}
   sbClient.channel('pub-' + PUBLIC_ROOM)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'room=eq.' + PUBLIC_ROOM }, (p) => {
       const r = p.new;
       if (!r || (pubMyId && r.user_id === pubMyId)) return;
-      chat.addRemote(r.text || '', r.nick || '?', false);
+      publicShow(r, false);
       if (notifSoundOn()) playSound('message');
     })
     .subscribe();
@@ -12161,7 +12207,9 @@ async function dmStart() {
     mine.forEach((r) => {
       const other = dmOtherOf(r.room);
       if (!other) return;
-      dm.receive(other, names[other] || '', { text: r.text || '', at: new Date(r.created_at).getTime(), mine: r.user_id === pubMyId });
+      const at = new Date(r.created_at).getTime();
+      dm.receive(other, names[other] || '', { text: r.text || '', at, mine: r.user_id === pubMyId });
+      dmPushInbox(other, names[other] || '', r.text || '', at);
     });
   } catch (e) {}
   sbClient.channel('dm-live')
@@ -12172,6 +12220,7 @@ async function dmStart() {
       const other = dmOtherOf(r.room);
       if (!other) return;
       dm.receive(other, r.nick || '', { text: r.text || '', at: Date.now(), mine: false });
+      dmPushInbox(other, r.nick || '', r.text || '', Date.now());
       if (notifSoundOn()) playSound('message');
     })
     .subscribe();
@@ -12516,7 +12565,21 @@ async function openNotifications() {
   const wrap = document.createElement('div');
   const r = await sbClient.rpc('notif_list', { lim: 40 });
   const rows = (!r.error && r.data) || [];
-  if (!rows.length) wrap.append(pickNote(t('notif.none')));
+  // الرسائل الخاصة الأخيرة تظهر في الجرس كما في القديم
+  Object.values(dmThreads).sort((a, b) => b.at - a.at).slice(0, 10).forEach((th) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'row';
+    const txt = document.createElement('span');
+    txt.textContent = (th.name || '?') + ': ' + (th.preview || '');
+    b.append(txt);
+    const when = document.createElement('small');
+    when.textContent = th.time;
+    b.append(when);
+    b.addEventListener('click', () => dm.openChat({ id: th.id, name: th.name }));
+    wrap.append(b);
+  });
+  if (!rows.length && !Object.keys(dmThreads).length) wrap.append(pickNote(t('notif.none')));
   const pics = await avatarsByNick(rows.map((n) => n.actor_nick));
   for (const n of rows) {
     const b = document.createElement('button');
