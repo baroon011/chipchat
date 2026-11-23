@@ -7153,7 +7153,7 @@ function feedClick(e) {
     // ضغطة على البطاقة نفسها (ليست زراً): للإعجاب المزدوج وتكبير الصورة
     const card = e.target.closest('.ppCard');
     if (card && !e.target.closest('input, video')) {
-      const p = feedPosts.find((x) => x.id === card.dataset.pid);
+      const p = feedFind('post', card.dataset.pid);
       if (p) feedOnTap(p, e.target);
     }
     return;
@@ -7190,6 +7190,21 @@ function feedRenderInto(root, posts) {
 function feedRender() {
   if (feedList) feedRenderInto(feedList, feedPosts);
   if (wallList) feedRenderInto(wallList, feedPosts.filter((p) => p.nick === FEED_ME));
+  feedSideRedraw();
+}
+
+// بطاقات الصفحات الشخصية تُعاد رسمها بعد كل إعجاب أو تعليق، إلا البطاقة التي فيها كتابة جارية
+function feedSideRedraw() {
+  document.querySelectorAll('.pv-posts .ppCard').forEach((el) => {
+    const p = feedSide.get(el.dataset.pid);
+    if (!p || el.contains(document.activeElement)) return;
+    el.replaceWith(feedPostEl(p));
+  });
+}
+
+// أزرار بطاقات الصفحة الشخصية تعمل بنفس منطق الرئيسية
+function feedBindClicks(el) {
+  el.addEventListener('click', feedClick);
 }
 
 function initFeed(root) {
@@ -12519,6 +12534,7 @@ async function loadPersonPage(person) {
 
   const postsBox = document.createElement('div');
   postsBox.className = 'pv-posts';
+  feedBindClicks(postsBox);
   box.append(postsBox);
   const canSee = d.me || !d.locked || d.fstate === 'friend';
   if (!canSee) {
