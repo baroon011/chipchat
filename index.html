@@ -375,6 +375,13 @@ body {
 @keyframes titleOut { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .intro-logo, .welcome-logo { animation: none !important; } }
 
+/* زر إظهار كلمة المرور */
+.pw-wrap { position: relative; display: block; width: 100%; }
+.pw-wrap input { width: 100%; padding-inline-end: 44px; box-sizing: border-box; }
+.pw-eye { position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: none; box-shadow: none; display: grid; place-items: center; color: inherit; opacity: 0.7; cursor: pointer; }
+.pw-eye.on { opacity: 1; }
+.pw-eye svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
 /* الشاشة الرئيسية والشريط السفلي */
 /* الشاشة الرئيسية ثابتة داخل الشاشة: الذي يتحرك هو المحتوى فقط، والشريطان يبقيان في مكانهما */
 .home {
@@ -6935,7 +6942,7 @@ function feedOpenReply(pid, parent, to) {
 
 // تحميل التعليقات من الخادم عند فتحها لأول مرة
 async function feedEnsureComments(pid) {
-  const post = feedPosts.find((p) => p.id === pid);
+  const post = feedFind('post', pid);
   if (!post || post.cLoaded || !feedServer.loadComments) return;
   try {
     post.comments = await feedServer.loadComments(pid);
@@ -6964,7 +6971,7 @@ function feedDeletePost(pid) {
 }
 
 async function feedDeleteComment(pid, cid) {
-  const post = feedPosts.find((p) => p.id === pid);
+  const post = feedFind('post', pid);
   if (!post) return;
   const c = post.comments.find((x) => x.id === cid);
   if (!c) return;
@@ -7015,7 +7022,7 @@ function feedPostMenu(p) {
 }
 
 function feedSharePost(pid) {
-  const p = feedPosts.find((x) => x.id === pid);
+  const p = feedFind('post', pid);
   if (!p) return;
   const { ov, box } = feedSheet();
   const friend = feedSheetBtn(box, ov, t('feed.shareFriend'), null);
@@ -7033,7 +7040,7 @@ function feedSharePost(pid) {
 }
 
 function feedEditPost(pid) {
-  const p = feedPosts.find((x) => x.id === pid);
+  const p = feedFind('post', pid);
   if (!p || p.nick !== FEED_ME) return;
   const next = prompt(t('feed.edit'), p.text || '');
   if (next == null) return;
@@ -7117,7 +7124,7 @@ function feedLongPress(el, onLong) {
 }
 
 async function feedSend(pid) {
-  const post = feedPosts.find((p) => p.id === pid);
+  const post = feedFind('post', pid);
   const d = feedDrafts[pid] || {};
   const text = (d.text || '').trim();
   if (!post || !text) return;
@@ -12542,9 +12549,15 @@ async function loadPersonPage(person) {
     return;
   }
   const pr = await sbClient.rpc('pp_user_posts', { p_user: person.id, lim: 30 });
-  const rows = await pfEnrich((!pr.error && pr.data) || []);
-  if (!rows.length) postsBox.append(pvNote(t('pv.noPosts')));
-  else rows.forEach((x) => postsBox.append(pvPostCard(x)));
+  if (pr.error) { postsBox.append(pvNote(pr.error.message)); return; }
+  try {
+    const rows = await pfEnrich(pr.data || []);
+    rows.forEach((x) => { x.nick = x.nick || d.nick || person.name || ''; x.user_id = x.user_id || person.id; });
+    if (!rows.length) postsBox.append(pvNote(t('pv.noPosts') + ' (' + (pr.data || []).length + ')'));
+    else rows.forEach((x) => postsBox.append(pvPostCard(x)));
+  } catch (e) {
+    postsBox.append(pvNote('خطأ في عرض المنشورات: ' + (e && e.message ? e.message : e)));
+  }
 }
 
 // زر قفل الملف في صفحتي: يخفي التفاصيل عن غير الأصدقاء
@@ -12572,6 +12585,31 @@ async function toggleLock() {
 }
 
 dm.setPersonOpen((person) => { loadPersonPage(person); });
+
+// زر إظهار كلمة المرور في كل حقول كلمة المرور، ليتأكد الشخص من كتابتها
+const PW_EYE = '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+function addPwEyes() {
+  document.querySelectorAll('input[type="password"]').forEach((inp) => {
+    if (inp.dataset.eye) return;
+    inp.dataset.eye = '1';
+    const wrap = document.createElement('span');
+    wrap.className = 'pw-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.append(inp);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pw-eye';
+    b.setAttribute('aria-label', 'إظهار كلمة المرور');
+    b.innerHTML = PW_EYE;
+    b.addEventListener('click', () => {
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      b.classList.toggle('on', show);
+    });
+    wrap.append(b);
+  });
+}
+addPwEyes();
 
 // أخطاء تشغيل الموسيقى تظهر في سطر الحالة للمشرف
 document.addEventListener('musicerror', (e) => {
