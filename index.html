@@ -7324,6 +7324,12 @@ function musicAudioEl() {
   if (!musicAudio) {
     musicAudio = new Audio();
     musicAudio.addEventListener('ended', () => (musicOn ? musicNext() : musicStop()));
+    // المتصفح أوقف الصوت دون أن يطلب التطبيق ذلك (والبث ما زال مفعّلاً): نعيده من الموضع الحي
+    musicAudio.addEventListener('pause', () => {
+      setTimeout(() => {
+        if (musicOn && !musicHeld && !musicWaiting && musicAudio && musicAudio.paused && musicTracks.length) musicResume();
+      }, 400);
+    });
     musicAudio.addEventListener('error', () => {
       const tr = musicTracks[musicCur];
       document.dispatchEvent(new CustomEvent('musicerror', { detail: { code: musicAudio.error ? musicAudio.error.code : 0, name: tr ? tr.name : '' } }));
