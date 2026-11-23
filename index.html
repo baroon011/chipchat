@@ -9098,6 +9098,10 @@ function caPc(n) {
   const room = caCall.room;
   caCall.pcs[n] = pc;
   caCall.local.getTracks().forEach((tr) => pc.addTrack(tr, caCall.local));
+  if (!caCall.local.getTracks().length) {
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+    pc.addTransceiver('video', { direction: 'recvonly' });
+  }
   pc.onicecandidate = (e) => {
     if (e.candidate) caSend(room, n, 'ice', e.candidate.toJSON());
   };
@@ -9191,6 +9195,12 @@ async function caAccept() {
   caIncEnd();
   if (caCall) return;
   try {
+    if (i.live) {
+      // مشاهدة البث: بلا مايكروفون ولا كاميرة، نستقبل صورة المذيع وصوته فقط
+      caBegin(i.room, i.title, false, new MediaStream());
+      caSend(i.room, i.from || '*', 'hello', { video: false });
+      return;
+    }
     const st = await caMedia(i.video);
     const v = st.getVideoTracks().length > 0;
     caBegin(i.room, i.title, v, st);
