@@ -2998,7 +2998,7 @@ textarea.st-input {
   <div class="intro" id="intro" aria-hidden="true">
     <canvas id="introFx"></canvas>
     <div class="intro-logo" id="introLogo"></div>
-    <div class="intro-title" id="introTitle"></div>
+    <div class="intro-title" id="introTitle" data-i18n="intro.title"></div>
   </div>
   <div class="welcome" id="welcome" hidden>
     <div class="intro-logo welcome-logo" id="welcomeLogo"></div>
@@ -10790,7 +10790,6 @@ function runIntro() {
   const logo = document.getElementById('introLogo');
   const title = document.getElementById('introTitle');
   cloneRose(logo);
-  title.textContent = t('intro.title');
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
     endIntro();
     return;
