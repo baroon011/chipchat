@@ -7382,6 +7382,7 @@ function musicLoad(i, offset) {
     // المتصفح يمنع التشغيل التلقائي قبل أي لمسة: ينتظر زر الصوت
     if (e && e.name === 'NotAllowedError') {
       musicWaiting = true;
+      armAutoResume();
       musicPaint();
     } else if (e) {
       document.dispatchEvent(new CustomEvent('musicerror', { detail: { code: e.name, name: musicTracks[i] ? musicTracks[i].name : '' } }));
@@ -7389,6 +7390,24 @@ function musicLoad(i, offset) {
   });
   musicLoop();
   musicPaint();
+}
+
+// المتصفح يسمح بالصوت بعد أول لمسة في أي مكان من الصفحة (كما في التطبيق القديم):
+// نستأنف البث عند أول لمسة أو ضغطة مفتاح، دون الحاجة إلى زر الصوت تحديداً
+let musicArmed = false;
+const MUSIC_UNLOCK_EVENTS = ['pointerdown', 'touchstart', 'keydown'];
+function armAutoResume() {
+  if (musicArmed) return;
+  musicArmed = true;
+  const go = () => {
+    musicArmed = false;
+    MUSIC_UNLOCK_EVENTS.forEach((ev) => document.removeEventListener(ev, go, true));
+    if (!musicOn) return;
+    musicWaiting = false;
+    musicResume();
+    musicPaint();
+  };
+  MUSIC_UNLOCK_EVENTS.forEach((ev) => document.addEventListener(ev, go, { capture: true, passive: true }));
 }
 
 function musicPlay(i) {
