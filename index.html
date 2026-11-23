@@ -434,8 +434,10 @@ body {
 }
 
 .ico {
+  flex: 0 0 auto;
   width: 52px;
   height: 52px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -489,13 +491,13 @@ body {
 
 /* زر النشر: نفس الزرار العادي، بس أيقونته متدرجة */
 .ico-post {
-  background: linear-gradient(135deg, var(--pink), var(--purple));
-  box-shadow: var(--glow-pink);
+  background: var(--purple);
+  box-shadow: none;
 }
 
 .ico-post svg {
-  stroke: var(--surface);
-  stroke-width: 2.4;
+  stroke: #fff;
+  stroke-width: 2;
 }
 
 /* قائمة الاتصال */
@@ -7264,6 +7266,7 @@ let musicOpenSettings = () => {};
 // الموسيقى تعمل في كل التطبيق، ما عدا قنوات المؤسسات والروضة: هناك لا شريط ولا صوت (المكان في zone.js)
 let musicDucked = false; // مكالمة واردة ترن: يخفت الصوت دون أن يتوقف
 const musicHolds = new Set(); // أسباب التوقف المؤقت: مكالمة، بث، فيديو، إهداء صوتي
+let musicHeld = false; // موقوفة مؤقتاً (زون الإدارة أو مكالمة/فيديو) وتعود تلقائياً عند زوال السبب
 let musicWaiting = false; // بعد أي توقف تلقائي لا تعود الموسيقى إلا بزر إلغاء الصامت
 let musicEpoch = 0; // بداية البث: تكمل الأغنية من موضع البث الحي لا من موضع التوقف
 const musicDur = {}; // مدة كل أغنية بالثواني بعد تحميلها
@@ -7433,10 +7436,12 @@ function musicSync() {
   }
   if (silentZone || musicHolds.size) {
     if (a && !a.paused) a.pause();
-    musicWaiting = true;
+    musicHeld = true;
     musicPaint();
     return;
   }
+  // زال سبب الإيقاف المؤقت: يعود البث تلقائياً من موضعه الحي دون لمسة
+  musicHeld = false;
   if (!musicWaiting && (!a || a.paused)) musicResume();
   musicPaint();
 }
@@ -7545,7 +7550,7 @@ function musicPaint() {
   const r = musicRefs;
   if (!r) return;
   r.bar.classList.toggle('playing', musicOn);
-  const silent = musicMuted || musicWaiting;
+  const silent = musicMuted || musicWaiting || musicHeld;
   r.mute.classList.toggle('on', silent);
   r.mute.setAttribute('aria-label', t(silent ? 'music.unmute' : 'music.mute'));
   const ns = document.getElementById('admNonstop');
