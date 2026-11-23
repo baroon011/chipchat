@@ -7575,6 +7575,10 @@ function musicSetServerTracks(list) {
       else musicStop();
     }
   }
+  // البث شغّال والأغاني وصلت الآن من الخادم: نبدأ من الموضع الحي فوراً دون انتظار أي لمسة من الإدارة
+  if (musicOn && !musicHeld && !musicWaiting && musicTracks.length && (!musicAudio || musicAudio.paused)) {
+    musicSync();
+  }
   musicPaint();
 }
 
