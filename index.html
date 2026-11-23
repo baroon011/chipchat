@@ -405,14 +405,14 @@ body {
   border: 0;
   background: none;
   color: var(--muted);
-  font: 700 11px var(--font);
+  font: 700 13px var(--font);
   cursor: pointer;
   z-index: 2;
 }
 
 .ico {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -425,8 +425,8 @@ body {
 }
 
 .tab svg {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.9;
@@ -537,6 +537,13 @@ body {
 /* زر النشر: التسمية أعلى من مؤشر الشاشة السفلي */
 .bar .tab[data-key="post"] .lbl { position: relative; top: -4px; }
 
+/* على الشاشات الواسعة (المتصفح على الكمبيوتر) تكبر الأيقونات أكثر */
+@media (min-width: 700px) {
+  .ico { width: 58px; height: 58px; }
+  .tab svg { width: 30px; height: 30px; }
+  .tab { font-size: 14px; }
+}
+
 /* الشريط العلوي: بلا كبسولة ولا حدود، ملاصق لأعلى الشاشة */
 /* الاتجاه بيتبع اللغة تلقائياً (RTL للعربي، LTR للباقي) */
 .topbar {
@@ -577,13 +584,13 @@ body {
   border: 0;
   background: none;
   color: var(--ink);
-  font: 700 11px var(--font);
+  font: 700 12px var(--font);
   cursor: pointer;
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -593,8 +600,8 @@ body {
 }
 
 .avatar svg {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   stroke: var(--surface);
   fill: none;
   stroke-width: 2;
@@ -610,8 +617,8 @@ body {
 }
 
 .ibtn {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border: 0;
   border-radius: 50%;
   background: none;
@@ -623,8 +630,8 @@ body {
 }
 
 .ibtn svg {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.9;
@@ -634,6 +641,14 @@ body {
 
 .ibtn:hover {
   color: var(--purple);
+}
+
+/* على الشاشات الواسعة (المتصفح على الكمبيوتر) تكبر الأيقونات أكثر */
+@media (min-width: 700px) {
+  .ibtn { width: 52px; height: 52px; }
+  .ibtn svg { width: 30px; height: 30px; }
+  .avatar { width: 52px; height: 52px; }
+  .avatar svg { width: 28px; height: 28px; }
 }
 
 /* القائمة الجانبية (الغرف العامة): زجاجي أبيض، ووميض نيون عند الضغط */
