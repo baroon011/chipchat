@@ -5470,7 +5470,7 @@ const PACKS = [
   { coins: 3000, price: 25 },
 ];
 
-function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () => {}, onAuthor = () => {} } = {}) {
+function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () => {}, onAuthor = () => {}, selfName = () => '' } = {}) {
   const $ = (id) => document.getElementById(id);
   const list = $('chatList');
   const form = $('chatForm');
@@ -5587,7 +5587,7 @@ function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () 
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    addMessage(text, '', { id: 'me', name: t('topbar.userName'), self: true });
+    addMessage(text, '', { id: 'me', name: selfName() || t('topbar.userName'), self: true });
     onSend(text);
     input.value = '';
   });
@@ -10398,7 +10398,7 @@ function openRoom(id) {
 }
 
 // الدردشة العامة: الإرسال الحقيقي هيتربط بالـ Supabase
-const chat = initChat({ onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
+const chat = initChat({ selfName: () => myNickVal, onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
 
 // الدور مؤقتاً من الرابط (?role=admin) للعرض بس. الصلاحية الحقيقية من السيرفر (RLS) لاحقاً
 const isAdmin = new URLSearchParams(location.search).get('role') === 'admin';
