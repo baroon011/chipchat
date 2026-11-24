@@ -10401,7 +10401,7 @@ function openRoom(id) {
 const chat = initChat({ onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
 
 // الدور مؤقتاً من الرابط (?role=admin) للعرض بس. الصلاحية الحقيقية من السيرفر (RLS) لاحقاً
-const isAdmin = true;
+const isAdmin = new URLSearchParams(location.search).get('role') === 'admin';
 chat.setAdmin(isAdmin);
 
 // القائمة الجانبية: الغرف العامة بس
