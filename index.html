@@ -10765,10 +10765,11 @@ feedServer.publish = async (text, files = []) => {
   }
 };
 feedServer.load = async () => {
+  window.__showErr && window.__showErr('تتبع: بدأ جلب الرئيسية ' + new Date().toLocaleTimeString());
   const { data: { user } } = await sbClient.auth.getUser();
-  if (!user) return;
+  if (!user) { window.__showErr && window.__showErr('تتبع: لا يوجد مستخدم في الجلسة'); return; }
+  window.__showErr && window.__showErr('تتبع: المستخدم ' + user.id.slice(0, 8));
   pfUid = user.id;
-  const { data, error } = await sbClient.rpc('pp_feed', { lim: 30 });
   const dbgEl = document.getElementById('feedDbg') || (() => {
     const x = document.createElement('p');
     x.id = 'feedDbg';
@@ -10777,6 +10778,8 @@ feedServer.load = async () => {
     if (fl) fl.parentNode.insertBefore(x, fl);
     return x;
   })();
+  dbgEl.textContent = 'تشخيص: جاري جلب الرئيسية من الخادم...';
+  const { data, error } = await sbClient.rpc('pp_feed', { lim: 30 });
   if (error) { dbgEl.textContent = 'خطأ الرئيسية: ' + error.message; return; }
   const rows = await pfEnrich(data || []);
   dbgEl.textContent = 'تشخيص: رجع الخادم ' + rows.length + ' منشورًا، منها ' + rows.filter((r) => r.user_id !== user.id).length + ' لغيرك';
