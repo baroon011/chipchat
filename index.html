@@ -10783,24 +10783,12 @@ feedServer.publish = async (text, files = []) => {
   }
 };
 feedServer.load = async () => {
-  window.__showErr && window.__showErr('تتبع: بدأ جلب الرئيسية ' + new Date().toLocaleTimeString());
   const { data: { user } } = await sbClient.auth.getUser();
-  if (!user) { window.__showErr && window.__showErr('تتبع: لا يوجد مستخدم في الجلسة'); return; }
-  window.__showErr && window.__showErr('تتبع: المستخدم ' + user.id.slice(0, 8));
+  if (!user) return;
   pfUid = user.id;
-  const dbgEl = document.getElementById('feedDbg') || (() => {
-    const x = document.createElement('p');
-    x.id = 'feedDbg';
-    x.style.cssText = 'font-size:12px;color:#6b5b85;margin:4px 16px;direction:rtl';
-    const fl = document.getElementById('feedList');
-    if (fl) fl.parentNode.insertBefore(x, fl);
-    return x;
-  })();
-  dbgEl.textContent = 'تشخيص: جاري جلب الرئيسية من الخادم...';
   const { data, error } = await sbClient.rpc('pp_feed', { lim: 30 });
-  if (error) { dbgEl.textContent = 'خطأ الرئيسية: ' + error.message; return; }
+  if (error) { console.warn('pp_feed', error.message); return; }
   const rows = await pfEnrich(data || []);
-  dbgEl.textContent = 'تشخيص: رجع الخادم ' + rows.length + ' منشورًا، منها ' + rows.filter((r) => r.user_id !== user.id).length + ' لغيرك';
   feedLoad(rows, user.id);
   renderMyWall();
 };
@@ -12530,25 +12518,6 @@ function pvNote(text) {
 function pvPostCard(r) {
   return feedCardFor(r, pfUid);
 }
-function pvPostCardOld(r) {
-  const card = document.createElement('article');
-  card.className = 'pf-post';
-  const body = document.createElement('p');
-  body.textContent = r.body || '';
-  card.append(body);
-  for (const m of r.media || []) {
-    const node = document.createElement(m.type === 'video' ? 'video' : 'img');
-    node.src = m.url;
-    if (m.type === 'video') { node.controls = true; node.playsInline = true; } else { node.alt = ''; node.loading = 'lazy'; }
-    node.style.cssText = 'width:100%;border-radius:12px;margin-top:6px;display:block';
-    card.append(node);
-  }
-  const when = document.createElement('small');
-  when.textContent = new Date(r.created_at).toLocaleString();
-  card.append(when);
-  return card;
-}
-
 async function loadPersonPage(person) {
   const box = document.getElementById('personBody');
   const avatarEl = document.getElementById('personAvatar');
@@ -12628,21 +12597,13 @@ async function loadPersonPage(person) {
   postsBox.className = 'pv-posts';
   feedBindClicks(postsBox);
   box.append(postsBox);
-  const canSee = d.me || !d.locked || d.fstate === 'friend';
-  if (!canSee) {
-    postsBox.append(pvNote(t('pv.locked')));
-    return;
-  }
+  // قاعدة البيانات هي التي تقرر من يرى ماذا (الأصدقاء المقبولون والمتابعون)
   const pr = await sbClient.rpc('pp_user_posts', { p_user: person.id, lim: 30 });
   if (pr.error) { postsBox.append(pvNote(pr.error.message)); return; }
-  try {
-    const rows = await pfEnrich(pr.data || []);
-    rows.forEach((x) => { x.nick = x.nick || d.nick || person.name || ''; x.user_id = x.user_id || person.id; });
-    if (!rows.length) postsBox.append(pvNote(t('pv.noPosts') + ' (' + (pr.data || []).length + ')'));
-    else rows.forEach((x) => postsBox.append(pvPostCard(x)));
-  } catch (e) {
-    postsBox.append(pvNote('خطأ في عرض المنشورات: ' + (e && e.message ? e.message : e)));
-  }
+  const rows = await pfEnrich(pr.data || []);
+  rows.forEach((x) => { x.nick = x.nick || d.nick || person.name || ''; x.user_id = x.user_id || person.id; });
+  if (!rows.length) postsBox.append(pvNote(t('pv.noPosts')));
+  else rows.forEach((x) => postsBox.append(pvPostCard(x)));
 }
 
 // زر قفل الملف في صفحتي: يخفي التفاصيل عن غير الأصدقاء
