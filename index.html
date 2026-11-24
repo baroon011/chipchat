@@ -2477,6 +2477,14 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 .chan-bar { display: flex; gap: 6px; overflow-x: auto; padding: 6px 10px; }
 .chan-bar-btn { flex: none; border: 1px solid #c03fd8; background: rgba(255,255,255,0.7); color: inherit; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .chan-bar-edit { background: linear-gradient(90deg, var(--pink), var(--purple)); color: #fff; border: 0; }
+
+/* القنوات المميزة في صفحة البحث: بطاقات عمودية واضحة */
+#discFeat { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 8px; }
+.feat-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: start; border: 1px solid #c03fd8; background: rgba(255,255,255,0.75); color: inherit; border-radius: 16px; padding: 12px 14px; font: inherit; cursor: pointer; }
+.feat-ico { font-size: 22px; flex: none; }
+.feat-tx { display: flex; flex-direction: column; min-width: 0; }
+.feat-tx strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feat-tx small { font-size: 12px; opacity: 0.7; }
 .chan-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; }
 .chan-ov-box { background: var(--surface); color: var(--ink); border-radius: 18px; padding: 14px; width: min(92vw, 380px); max-height: 80vh; overflow-y: auto; }
 .chan-ov-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
@@ -10250,40 +10258,18 @@ function initStatus(deps) {
     if (cur() !== r) return;
     if (r.kind === 'image' && u) box.innerHTML = '<img src="' + stEsc(u) + '" alt="">';
     else if (r.kind === 'video' && u) {
-      // نحمّل الفيديو كاملاً أولاً ثم نشغّله من ملف محلي: أضمن من البث المباشر على بعض الهواتف
-      box.innerHTML = '<div style="opacity:.6">…</div>';
-      try {
-        const res = await fetch(u);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const blob = await res.blob();
-        if (cur() !== r) return;
-        box.innerHTML = '<video playsinline muted preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000"></video>' +
-          '<button class="st-bigplay" type="button" hidden>▶</button>' +
-          '<button class="st-replay" type="button" hidden>↻ ' + stEsc(stTr('status.replay')) + '</button>';
-        const v = box.querySelector('video');
-        const rb = box.querySelector('.st-replay');
-        const bp = box.querySelector('.st-bigplay');
-        v.src = URL.createObjectURL(blob);
-        $f('#stSnd').textContent = '🔇';
-        // زر تشغيل كبير يظهر إن توقف الفيديو، والنقر عليه يشغّله مباشرة (نقرة المستخدم تسمح بالتشغيل)
-        const showPlay = () => { bp.hidden = !v.paused || v.ended; };
-        // تشخيص: أبعاد الفيديو المعروفة للمتصفح وحالة التحميل، تظهر في أسفل الحالة
-        const diag = () => { $f('.st-note').textContent = 'فيديو: ' + v.videoWidth + 'x' + v.videoHeight + ' · حالة ' + v.readyState + (v.paused ? ' · متوقف' : ' · يعمل'); };
-        v.addEventListener('loadeddata', diag);
-        v.addEventListener('playing', diag);
-        v.addEventListener('ended', () => { rb.hidden = false; bp.hidden = true; });
-        v.addEventListener('pause', showPlay);
-        v.addEventListener('playing', () => { bp.hidden = true; });
-        v.addEventListener('error', () => { $f('.st-note').textContent = stTr('status.playErr'); });
-        bp.addEventListener('click', () => { bp.hidden = true; v.play().catch((e) => { $f('.st-note').textContent = stTr('status.playErr') + ': ' + e.name; bp.hidden = false; }); });
-        rb.addEventListener('click', () => { rb.hidden = true; v.currentTime = 0; v.play().catch(() => {}); });
-        v.play().catch(() => { bp.hidden = false; });
-        setTimeout(showPlay, 800);
-      } catch (e) {
-        if (cur() !== r) return;
-        box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('status.mediaErr')) + '</div>';
-        $f('.st-note').textContent = stTr('status.playErr') + ': ' + (e.message || e);
-      }
+      // مشغّل المتصفح الأصلي مع أزرار التحكم الظاهرة دائماً (تشغيل، صوت، ملء الشاشة)،
+      // والمشغل يبدأ مكتوماً ليعمل التشغيل التلقائي، ويمكن رفع الصوت من أزرار التحكم
+      box.innerHTML = '<video controls muted playsinline preload="auto" src="' + stEsc(u) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;pointer-events:auto"></video>' +
+        '<div class="st-vdiag" style="position:absolute;left:8px;top:8px;right:8px;color:#fff;font-size:12px;background:rgba(0,0,0,.55);padding:4px 8px;border-radius:8px;pointer-events:none"></div>';
+      const v = box.querySelector('video');
+      const dg = box.querySelector('.st-vdiag');
+      // تشخيص يظهر داخل الشاشة: أبعاد الفيديو وحالة التشغيل، أو سبب الخطأ
+      const info = () => 'فيديو: ' + v.videoWidth + 'x' + v.videoHeight + ' · حالة ' + v.readyState + (v.paused ? ' · متوقف' : ' · يعمل');
+      v.addEventListener('loadedmetadata', () => { dg.textContent = info(); });
+      v.addEventListener('playing', () => { dg.textContent = info(); });
+      v.addEventListener('error', () => { dg.textContent = stTr('status.playErr') + (v.error ? ' (' + v.error.code + ')' : ''); });
+      v.play().catch(() => { dg.textContent = info(); });
     }
     else box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('status.mediaErr')) + '</div>';
   }
@@ -12388,12 +12374,27 @@ async function loadFeaturedDiscover() {
     head.textContent = '⭐ ' + t('disc.featured');
     discFeat.append(head);
     rows.forEach((x) => {
-      const txt = (x.cicon || '📣') + ' ' + (x.cname || '');
-      const sub = (x.owner_nick ? x.owner_nick + ' • ' : '') + (x.mcount || 0) + ' ' + t('disc.followers');
-      discFeat.append(chanBtn(txt + ' — ' + sub, async () => {
-        const { data } = await sbClient.from('chans').select('code').eq('id', x.cid).maybeSingle();
+      // بطاقة واضحة لكل قناة: أيقونة، الاسم، ثم المالك وعدد المتابعين
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'feat-row';
+      const ic = document.createElement('span');
+      ic.className = 'feat-ico';
+      ic.textContent = x.cicon || '📣';
+      const tx = document.createElement('span');
+      tx.className = 'feat-tx';
+      const nm = document.createElement('strong');
+      nm.textContent = x.cname || '';
+      const sm = document.createElement('small');
+      sm.textContent = (x.owner_nick ? x.owner_nick + ' • ' : '') + (x.mcount || 0) + ' ' + t('disc.followers');
+      tx.append(nm, sm);
+      b.append(ic, tx);
+      b.addEventListener('click', async () => {
+        const { data, error } = await sbClient.from('chans').select('code').eq('id', x.cid).maybeSingle();
+        if (error) { discSay(error.message); return; }
         if (data && data.code) chanJoinByCode(data.code); else discSay(t('chan.badCode'));
-      }, 'chan-bar-btn'));
+      });
+      discFeat.append(b);
     });
   } catch (e) { /* القائمة اختيارية */ }
 }
