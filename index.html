@@ -10019,6 +10019,7 @@ const STATUS_CSS = `
 .st-media{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .st-media img,.st-media video{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .st-text{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box;text-align:center;font-size:26px;font-weight:900;color:#fff}
+.st-bigplay{position:absolute;z-index:5;pointer-events:auto;width:72px;height:72px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.5);color:#fff;font-size:28px;cursor:pointer;padding:0 0 0 6px}
 .st-replay{pointer-events:auto;position:absolute;z-index:4;height:44px;padding:0 18px;border-radius:22px;border:2px solid #fff;background:rgba(0,0,0,.55);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
 .st-content video{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .st-prog{height:6px;border-radius:6px;background:rgba(124,29,255,.15);overflow:hidden}
@@ -10256,15 +10257,24 @@ function initStatus(deps) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         if (cur() !== r) return;
-        box.innerHTML = '<video playsinline muted preload="auto"></video><button class="st-replay" type="button" hidden>↻ ' + stEsc(stTr('status.replay')) + '</button>';
+        box.innerHTML = '<video playsinline muted preload="auto"></video>' +
+          '<button class="st-bigplay" type="button" hidden>▶</button>' +
+          '<button class="st-replay" type="button" hidden>↻ ' + stEsc(stTr('status.replay')) + '</button>';
         const v = box.querySelector('video');
         const rb = box.querySelector('.st-replay');
+        const bp = box.querySelector('.st-bigplay');
         v.src = URL.createObjectURL(blob);
         $f('#stSnd').textContent = '🔇';
-        v.addEventListener('ended', () => { rb.hidden = false; });
+        // زر تشغيل كبير يظهر إن توقف الفيديو، والنقر عليه يشغّله مباشرة (نقرة المستخدم تسمح بالتشغيل)
+        const showPlay = () => { bp.hidden = !v.paused || v.ended; };
+        v.addEventListener('ended', () => { rb.hidden = false; bp.hidden = true; });
+        v.addEventListener('pause', showPlay);
+        v.addEventListener('playing', () => { bp.hidden = true; });
         v.addEventListener('error', () => { $f('.st-note').textContent = stTr('status.playErr'); });
+        bp.addEventListener('click', () => { bp.hidden = true; v.play().catch((e) => { $f('.st-note').textContent = stTr('status.playErr') + ': ' + e.name; bp.hidden = false; }); });
         rb.addEventListener('click', () => { rb.hidden = true; v.currentTime = 0; v.play().catch(() => {}); });
-        v.play().catch(() => { $f('.st-note').textContent = stTr('status.playErr'); });
+        v.play().catch(() => { bp.hidden = false; });
+        setTimeout(showPlay, 800);
       } catch (e) {
         if (cur() !== r) return;
         box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('status.mediaErr')) + '</div>';
