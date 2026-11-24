@@ -10249,15 +10249,27 @@ function initStatus(deps) {
     if (cur() !== r) return;
     if (r.kind === 'image' && u) box.innerHTML = '<img src="' + stEsc(u) + '" alt="">';
     else if (r.kind === 'video' && u) {
-      // يعمل تلقائياً عند كل فتح، وعند الانتهاء يظهر زر إعادة التشغيل
-      box.innerHTML = '<video src="' + stEsc(u) + '" playsinline preload="auto" muted></video><button class="st-replay" type="button" hidden>↻ ' + stEsc(stTr('status.replay')) + '</button>';
-      const v = box.querySelector('video');
-      const rb = box.querySelector('.st-replay');
-      $f('#stSnd').textContent = '🔇';
-      v.addEventListener('ended', () => { rb.hidden = false; });
-      v.addEventListener('error', () => { $f('.st-note').textContent = stTr('status.playErr') + ' (' + (v.error ? v.error.code : '?') + ')'; });
-      rb.addEventListener('click', () => { rb.hidden = true; v.currentTime = 0; v.play().catch(() => {}); });
-      v.play().catch(() => { $f('.st-note').textContent = stTr('status.playErr'); });
+      // نحمّل الفيديو كاملاً أولاً ثم نشغّله من ملف محلي: أضمن من البث المباشر على بعض الهواتف
+      box.innerHTML = '<div style="opacity:.6">…</div>';
+      try {
+        const res = await fetch(u);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        if (cur() !== r) return;
+        box.innerHTML = '<video playsinline muted preload="auto"></video><button class="st-replay" type="button" hidden>↻ ' + stEsc(stTr('status.replay')) + '</button>';
+        const v = box.querySelector('video');
+        const rb = box.querySelector('.st-replay');
+        v.src = URL.createObjectURL(blob);
+        $f('#stSnd').textContent = '🔇';
+        v.addEventListener('ended', () => { rb.hidden = false; });
+        v.addEventListener('error', () => { $f('.st-note').textContent = stTr('status.playErr'); });
+        rb.addEventListener('click', () => { rb.hidden = true; v.currentTime = 0; v.play().catch(() => {}); });
+        v.play().catch(() => { $f('.st-note').textContent = stTr('status.playErr'); });
+      } catch (e) {
+        if (cur() !== r) return;
+        box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('status.mediaErr')) + '</div>';
+        $f('.st-note').textContent = stTr('status.playErr') + ': ' + (e.message || e);
+      }
     }
     else box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('status.mediaErr')) + '</div>';
   }
