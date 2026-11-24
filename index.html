@@ -10045,6 +10045,13 @@ const STATUS_CSS = `
 
 function stTr(k) { return t(k); }
 
+function guessMime(name, kind) {
+  const ext = (String(name).split('.').pop() || '').toLowerCase();
+  const map = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', '3gp': 'video/3gpp',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic' };
+  return map[ext] || (kind === 'image' ? 'image/jpeg' : 'video/mp4');
+}
+
 function stEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -10248,7 +10255,7 @@ function initStatus(deps) {
       const rb = box.querySelector('.st-replay');
       $f('#stSnd').textContent = '🔇';
       v.addEventListener('ended', () => { rb.hidden = false; });
-      v.addEventListener('error', () => { $f('.st-note').textContent = stTr('status.playErr'); });
+      v.addEventListener('error', () => { $f('.st-note').textContent = stTr('status.playErr') + ' (' + (v.error ? v.error.code : '?') + ')'; });
       rb.addEventListener('click', () => { rb.hidden = true; v.currentTime = 0; v.play().catch(() => {}); });
       v.play().catch(() => { $f('.st-note').textContent = stTr('status.playErr'); });
     }
@@ -10327,8 +10334,10 @@ function initStatus(deps) {
     };
     wrap.querySelectorAll('[data-k="image"],[data-k="video"]').forEach((b) => b.addEventListener('click', async () => {
       const k = b.dataset.k;
-      const f = await deps.pickFile(k === 'image' ? 'image/*' : 'video/*');
-      if (!f) return;
+      const picked = await deps.pickFile(k === 'image' ? 'image/*' : 'video/*');
+      if (!picked) return;
+      // بعض الهواتف لا تعطي نوع الملف، فيُرفع كملف عام ولا يعمل الفيديو: نحدد النوع من الامتداد
+      const f = picked.type ? picked : new File([picked], picked.name, { type: guessMime(picked.name, k) });
       if (k === 'video') {
         const sec = await videoSeconds(f);
         if (!isFinite(sec) || sec > MAX_VID_SEC + 0.5) { note.textContent = stTr('status.vidLong'); pending = null; return; }
