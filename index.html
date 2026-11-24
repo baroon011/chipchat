@@ -5816,7 +5816,6 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onSen
   let inbox = [];
   let friends = [];
   let windows = [];        // { id, name, state: 'full' | 'min', messages: [], pending: null }
-  let expanded = false;    // قائمة المحادثات المصغرة مفتوحة ولا لأ
   let personCur = null;
   let lastFree = 0;
 
@@ -5886,7 +5885,6 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onSen
 
   // ----- المحادثات: فتح، تصغير، تكبير، إغلاق -----
   function setFull(id) {
-    expanded = false;
     windows.forEach((w) => {
       w.state = w.id === id ? 'full' : 'min';
     });
@@ -5912,7 +5910,6 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onSen
 
   function closeWindow(id) {
     windows = windows.filter((w) => w.id !== id);
-    if (!windows.some((w) => w.state === 'min')) expanded = false;
     render();
   }
 
@@ -6451,69 +6448,11 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onSen
     );
   }
 
-  // ----- فقاعات المصغرة (زي النسخة القديمة) -----
-  // محادثة واحدة = فقاعة بحرفها. أكتر من واحدة = فقاعة واحدة بالعدد، والضغط عليها بيفتح القائمة كلها
-  function buildBubble(w) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'dm-bubble';
-    b.textContent = w.name.charAt(0);
-    b.setAttribute('aria-label', w.name);
-    b.addEventListener('click', () => {
-      if (b.dataset.dragged === '1') {
-        b.dataset.dragged = '0';
-        return;
-      }
-      setFull(w.id);
-    });
-    swipe(b, { away: true, limit: 70, onSwipe: () => closeWindow(w.id) });
-    return b;
-  }
-
-  // المقبض يخفت تلقائياً بعد ثانيتين ونصف من دون لمس، ويعود عند النقر على حافته
-  let fadeT = 0;
-  function armFade(col) {
-    const show = () => {
-      col.classList.remove('faded');
-      clearTimeout(fadeT);
-      fadeT = setTimeout(() => col.classList.add('faded'), 2500);
-    };
-    show();
-    col.addEventListener('pointerdown', show);
-  }
-
-  function buildGroup(count) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'dm-handle';
-    b.setAttribute('aria-label', t('dm.openChats'));
-    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span class="dm-bubble-count">${count}</span>`;
-    b.addEventListener('click', () => {
-      expanded = !expanded;
-      render();
-    });
-    return b;
-  }
-
+  // المحادثة المفتوحة فقط تظهر. المحادثات المصغرة لا تظهر كفقاعات، وتُفتح من قائمة الأصدقاء
   function render() {
     stage.innerHTML = '';
     const full = windows.find((w) => w.state === 'full');
-    const mins = windows.filter((w) => w.state === 'min');
     if (full) stage.append(buildFull(full));
-    if (!mins.length) {
-      expanded = false;
-      return;
-    }
-    const col = document.createElement('div');
-    col.className = 'dm-bubbles';
-    if (mins.length === 1) {
-      col.append(buildBubble(mins[0]));
-    } else {
-      col.append(buildGroup(mins.length));
-      if (!expanded) armFade(col);
-      if (expanded) mins.forEach((w) => col.append(buildBubble(w)));
-    }
-    stage.append(col);
   }
 
   // ----- قائمة الشخص (من اسمه في الدردشة العامة) -----
@@ -10013,31 +9952,35 @@ const STATUS_CSS = `
 .st-ring img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #fff;display:block;box-sizing:border-box}
 .st-plus{position:absolute;bottom:-2px;inset-inline-end:-2px;width:22px;height:22px;border-radius:50%;background:#7c1dff;color:#fff;font-weight:800;font-size:15px;line-height:20px;text-align:center;border:2px solid #fff;box-sizing:border-box}
 .st-nm{font-size:11px;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st-full{position:fixed;inset:0;z-index:9500;background:#000;color:#fff;direction:rtl;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+.st-full{position:fixed;inset:0;z-index:9500;background:#000;color:#fff;direction:rtl;display:flex;flex-direction:column;touch-action:pan-y;user-select:none;-webkit-user-select:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
 .st-full[hidden]{display:none!important}
-.st-dots{display:flex;gap:4px;padding:10px 12px 0}
+.st-dots{display:flex;gap:4px;padding:10px 12px 0;flex:none}
 .st-dots i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35)}
 .st-dots i.on{background:#fff}
-.st-hd{display:flex;align-items:center;gap:8px;padding:8px 12px}
+.st-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;flex:none}
 .st-hd img{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none}
 .st-who{flex:1;min-width:0}
 .st-who b{display:block;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .st-who small{opacity:.8;font-size:12px}
 .st-x{width:36px;height:36px;border-radius:50%;border:1px solid #fff;background:rgba(0,0,0,.45);color:#fff;font-size:18px;cursor:pointer;padding:0;flex:none}
-.st-media{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.st-media > .pl-wrap{height:100%;border-radius:0;justify-content:center}
+.st-stage{flex:1;min-height:0;position:relative;overflow:hidden}
+.st-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+.st-media > .pl-wrap{height:100%;border-radius:0}
 .st-media > .pl-wrap .pl-media{flex:1;max-height:none}
 .st-media img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .st-text{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box;text-align:center;font-size:26px;font-weight:900;color:#fff;white-space:pre-wrap}
 .st-wait{padding:20px;opacity:.8;text-align:center}
-.st-acts{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 12px}
-.st-acts button{width:44px;height:44px;border-radius:50%;border:2px solid #fff;background:rgba(120,120,120,.5);color:#fff;font-size:20px;cursor:pointer;padding:0;display:grid;place-items:center}
-.st-acts button.on{background:linear-gradient(135deg,#ff3df2,#7c1dff)}
-.st-acts .cnt{font-size:13px;font-weight:700;min-width:14px}
-.st-bar{display:flex;align-items:center;gap:10px;padding:6px 12px}
+.st-zone{position:absolute;top:0;bottom:64px;width:50%;z-index:2;background:none;border:0;padding:0;margin:0;cursor:pointer}
+.st-zone-next{left:0}
+.st-zone-prev{right:0}
+.st-col{position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:14px}
+.st-col button{width:48px;height:48px;border-radius:50%;border:2px solid #fff;background:rgba(120,120,120,.55);color:#fff;font-size:20px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center}
+.st-col button.on{background:linear-gradient(135deg,#ff3df2,#7c1dff)}
+.st-col .cnt{font-size:12px;font-weight:700;margin-top:-10px;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.st-bar{display:flex;align-items:center;gap:10px;padding:6px 12px;flex:none}
 .st-bar input{flex:1;min-width:0;height:40px;border-radius:20px;border:1px solid #fff;background:rgba(0,0,0,.45);color:#fff;padding:0 14px;font-size:14px}
 .st-bar button{height:40px;min-width:40px;border-radius:20px;border:1px solid #fff;background:#ff3df2;color:#fff;font-size:16px;cursor:pointer;padding:0 10px}
-.st-note{font-size:13px;opacity:.85;padding:0 12px 6px;min-height:0}
+.st-note{font-size:13px;opacity:.85;padding:0 12px 6px;min-height:0;flex:none}
 .st-prog{height:6px;border-radius:6px;background:rgba(124,29,255,.15);overflow:hidden}
 .st-prog i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#ff3df2,#7c1dff);box-shadow:0 0 8px #ff3df2,0 0 16px #7c1dff;transition:width .2s linear}
 .st-pub{display:flex;flex-direction:column;gap:10px;padding:4px 0}
@@ -10134,8 +10077,8 @@ function initStatus(deps) {
   }
 
   // ----- العارض (ملء الشاشة) -----
-  // لا توجد أي طبقة تغطي الوسائط: الأزرار في شريط منفصل أسفل الشاشة، والمشغّل يأخذ المساحة كاملة.
-  // التنقل: زرا ‹ › ، أو السحب يميناً ويساراً للصديق التالي.
+  // التنقل بالنقر: النصف الأيسر للحالة التالية، والنصف الأيمن للسابقة. السحب أفقياً = الصديق التالي.
+  // الأزرار العمودية (إعجاب، تعليق، مشاركة) على اليسار. شريط المشغّل أسفل الفيديو خارج منطقة النقر.
   const full = document.createElement('div');
   full.className = 'st-full';
   full.hidden = true;
@@ -10143,13 +10086,15 @@ function initStatus(deps) {
     '<div class="st-dots"></div>' +
     '<div class="st-hd"><img alt=""><div class="st-who"><b></b><small></small></div>' +
     '<button class="st-x" type="button" aria-label="' + stEsc(stTr('status.close')) + '">✕</button></div>' +
-    '<div class="st-media"></div>' +
-    '<div class="st-acts">' +
-      '<button id="stPrev" type="button" aria-label="' + stEsc(stTr('status.prev')) + '">›</button>' +
-      '<button id="stRL" type="button">♡</button><span class="cnt" id="stRLn"></span>' +
-      '<button id="stRCn" type="button">💬</button><span class="cnt" id="stRCnN"></span>' +
-      '<button id="stShare" type="button">↗</button>' +
-      '<button id="stNext" type="button" aria-label="' + stEsc(stTr('status.next')) + '">‹</button>' +
+    '<div class="st-stage">' +
+      '<div class="st-media"></div>' +
+      '<button class="st-zone st-zone-next" type="button" aria-label="' + stEsc(stTr('status.next')) + '"></button>' +
+      '<button class="st-zone st-zone-prev" type="button" aria-label="' + stEsc(stTr('status.prev')) + '"></button>' +
+      '<div class="st-col">' +
+        '<button id="stRL" type="button">♡</button><span class="cnt" id="stRLn"></span>' +
+        '<button id="stRCn" type="button">💬</button><span class="cnt" id="stRCnN"></span>' +
+        '<button id="stShare" type="button">↗</button>' +
+      '</div>' +
     '</div>' +
     '<div class="st-bar"><input id="stCmI" type="text" placeholder="' + stEsc(stTr('status.comment')) + '"><button id="stCmS" type="button">➤</button></div>' +
     '<div class="st-note"></div>';
@@ -10157,24 +10102,27 @@ function initStatus(deps) {
 
   const $f = (sel) => full.querySelector(sel);
   const media = $f('.st-media');
+  const stage = $f('.st-stage');
   $f('.st-x').onclick = closeFull;
   $f('#stRL').onclick = toggleLike;
   $f('#stRCn').onclick = () => $f('#stCmI').focus();
   $f('#stShare').onclick = shareCur;
   $f('#stCmS').onclick = sendComment;
   $f('#stCmI').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendComment(); });
-  $f('#stPrev').onclick = prevStatus;
-  $f('#stNext').onclick = nextStatus;
 
+  // السحب الأفقي يفتح الصديق التالي، ولا ينقر النقر الذي يليه
   let sx = null;
-  media.addEventListener('pointerdown', (e) => { sx = { x: e.clientX, y: e.clientY }; });
-  media.addEventListener('pointerup', (e) => {
+  let swiped = false;
+  stage.addEventListener('pointerdown', (e) => { sx = { x: e.clientX, y: e.clientY }; swiped = false; });
+  stage.addEventListener('pointerup', (e) => {
     if (!sx) return;
     const dx = e.clientX - sx.x;
     const dy = e.clientY - sx.y;
     sx = null;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) nextFriend();
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) { swiped = true; nextFriend(); }
   });
+  $f('.st-zone-next').addEventListener('click', () => { if (swiped) { swiped = false; return; } nextStatus(); });
+  $f('.st-zone-prev').addEventListener('click', () => { if (swiped) { swiped = false; return; } prevStatus(); });
 
   const cur = () => (groups[gi] && groups[gi].items[si]) || null;
 
@@ -10187,7 +10135,7 @@ function initStatus(deps) {
   }
   function closeFull() {
     full.hidden = true;
-    media.replaceChildren(); // يوقف الفيديو بإزالته
+    media.replaceChildren(); // إزالة العنصر توقف الفيديو
     load();
   }
   // التالي: الحالة التالية لنفس الصديق، ثم أول حالة للصديق التالي
@@ -10216,6 +10164,14 @@ function initStatus(deps) {
     return u || null;
   }
 
+  function stBox(cls, text, bg) {
+    const d = document.createElement('div');
+    d.className = cls;
+    d.textContent = text;
+    if (bg) d.style.background = bg;
+    return d;
+  }
+
   async function showCur() {
     const g = groups[gi];
     const r = cur();
@@ -10233,39 +10189,28 @@ function initStatus(deps) {
     $f('#stCmI').placeholder = stTr('status.comment');
     $f('.st-note').textContent = '';
     media.replaceChildren();
-
-    if (r.kind === 'text') {
-      const d = document.createElement('div');
-      d.className = 'st-text';
-      d.style.background = BG[r.bg] || BG.p;
-      d.textContent = r.body || '';
-      media.append(d);
-      return;
+    try {
+      if (r.kind === 'text') {
+        media.append(stBox('st-text', r.body || '', BG[r.bg] || BG.p));
+        return;
+      }
+      media.append(stBox('st-wait', '…'));
+      const u = await mediaUrl(r);
+      if (cur() !== r) return;
+      media.replaceChildren();
+      if (!u) { media.append(stBox('st-wait', stTr('status.mediaErr'))); return; }
+      if (r.kind === 'image') {
+        const im = document.createElement('img');
+        im.src = u;
+        im.alt = '';
+        media.append(im);
+        return;
+      }
+      // الفيديو: مشغّل التطبيق الموحّد، يبدأ مكتوماً تلقائياً
+      mountPlayer(media, u, { kind: 'video', muted: true, autoplay: true });
+    } catch (e) {
+      media.replaceChildren(stBox('st-wait', stTr('status.mediaErr') + ': ' + ((e && e.message) || e)));
     }
-    const wait = document.createElement('div');
-    wait.className = 'st-wait';
-    wait.textContent = '…';
-    media.append(wait);
-    const u = await mediaUrl(r);
-    if (cur() !== r) return;
-    media.replaceChildren();
-    if (!u) { media.append(stMsg(stTr('status.mediaErr'))); return; }
-    if (r.kind === 'image') {
-      const im = document.createElement('img');
-      im.src = u;
-      im.alt = '';
-      media.append(im);
-      return;
-    }
-    // الفيديو: مشغّل التطبيق الموحّد، يبدأ مكتوماً تلقائياً
-    mountPlayer(media, u, { kind: 'video', muted: true, autoplay: true });
-  }
-
-  function stMsg(text) {
-    const d = document.createElement('div');
-    d.className = 'st-wait';
-    d.textContent = text;
-    return d;
   }
 
   async function toggleLike() {
@@ -13301,7 +13246,12 @@ const statusApi = initStatus({
     inp.click();
   }),
 });
-if (pfStoryOld) statusApi.mount(pfStoryOld.parentElement);
+// الحالات: شريط أفقي في أعلى الصفحة الشخصية (بدل القائمة العمودية الجانبية)
+if (pfStoryOld) {
+  const slot = pfStoryOld.parentElement;
+  slot.style.cssText = 'display:block;width:100%';
+  statusApi.mount(slot);
+}
 
 // ===== الإشعارات (الجرس): ما ينشره الأصدقاء والصفحات والقنوات التي أتابعها، من notif_list كما في القديم =====
 // زر البريد خاص بالاتصالات والمحادثات الخاصة فقط، والجرس للإشعارات
