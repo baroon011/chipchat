@@ -6948,7 +6948,7 @@ async function feedEnsureComments(pid) {
     post.comments = await feedServer.loadComments(pid);
     post.cLoaded = true;
     feedRender();
-  } catch (e) { /* يبقى الحال كما هو */ }
+  } catch (e) { alert('تعذر تحميل التعليقات: ' + (e && e.message ? e.message : e)); }
 }
 
 // الصلاحيات: المنشور يحذفه صاحبه، والتعليق يحذفه صاحب المنشور أو صاحب التعليق
@@ -7059,7 +7059,7 @@ async function feedLike(p, fromDouble = false) {
       const r = await feedServer.like(p.id);
       p.likes = r.count;
       p.mine = r.liked ? 1 : 0;
-    } catch (e) { return; }
+    } catch (e) { alert('تعذر الإعجاب: ' + (e && e.message ? e.message : e)); return; }
   } else {
     if (p.mine === 1) { p.likes--; p.mine = 0; } else { p.likes++; p.mine = 1; }
   }
@@ -7134,6 +7134,7 @@ async function feedSend(pid) {
       post.comments = await feedServer.loadComments(pid);
       post.cLoaded = true;
     } catch (e) {
+      alert('تعذر إرسال التعليق: ' + (e && e.message ? e.message : e));
       return;
     }
   } else {
