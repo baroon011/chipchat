@@ -10210,7 +10210,7 @@ function openShop(type) {
 
 // قنواتي: زر القنوات التي أعمل بها يظهر للمشترك تلقائياً، ويعرض القنوات التي يعمل فيها كمدير أو مشرف فقط
 // الاشتراك يأتي من الخادم لاحقاً، ومؤقتاً يظهر في وضع المشرف (role=admin) للاختبار
-document.getElementById('chanWorkBtn').hidden = new URLSearchParams(location.search).get('role') !== 'admin';
+document.getElementById('chanWorkBtn').hidden = true;
 document.getElementById('chanWorkBtn').addEventListener('click', () => {
   const mine = myChannels.filter((c) => c.role === 'manager' || c.role === 'moderator');
   const box = document.createElement('div');
@@ -10400,9 +10400,31 @@ function openRoom(id) {
 // الدردشة العامة: الإرسال الحقيقي هيتربط بالـ Supabase
 const chat = initChat({ selfName: () => myNickVal, onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
 
-// الدور مؤقتاً من الرابط (?role=admin) للعرض بس. الصلاحية الحقيقية من السيرفر (RLS) لاحقاً
-const isAdmin = new URLSearchParams(location.search).get('role') === 'admin';
-chat.setAdmin(isAdmin);
+// الإدارة تُحدَّد من السيرفر عبر is_staff() (نفس الدالة التي تحمي سياسات الموسيقى).
+// وضع المطوّر (DEV_FORCE_ADMIN) يُضبط من البناء فقط، ويكون false في النسخة المنشورة.
+const DEV_FORCE_ADMIN = false;
+let isAdmin = false;
+function applyAdminRole(on) {
+  isAdmin = !!on;
+  chat.setAdmin(isAdmin);
+  profile.setAdmin(isAdmin);
+  appSettings.setAdmin(isAdmin);
+  discover.setAdmin(isAdmin);
+  music.setAdmin(isAdmin);
+  const cw = document.getElementById('chanWorkBtn');
+  if (cw) cw.hidden = !isAdmin;
+  renderRadioBtn();
+}
+async function loadAdminRole() {
+  if (DEV_FORCE_ADMIN) { applyAdminRole(true); return; }
+  try {
+    const { data, error } = await sbClient.rpc('is_staff');
+    if (error) throw error;
+    applyAdminRole(data === true);
+  } catch (e) {
+    applyAdminRole(false);
+  }
+}
 
 // القائمة الجانبية: الغرف العامة بس
 const sidebar = initSidebar({
@@ -10427,10 +10449,6 @@ const profile = initSettings({
   onPassword: (pwd) => {},
   onSoundChange: (name, value) => setSoundPref(name, value),
 });
-profile.setAdmin(isAdmin);
-appSettings.setAdmin(isAdmin);
-discover.setAdmin(isAdmin);
-music.setAdmin(isAdmin);
 const call = initCall({ music, getRoom: () => ({ id: currentRoomId, title: chatTitle.textContent }) });
 
 // الاتصال من الشريط السفلي: اختر من الأصدقاء، أو من الهاتف
@@ -12366,6 +12384,7 @@ async function publicStart() {
   try {
     const { data: { user } } = await sbClient.auth.getUser();
     pubMyId = user ? user.id : null;
+    loadAdminRole();
     dmStart();
     const { data } = await sbClient.from('messages').select('*').eq('room', PUBLIC_ROOM).order('created_at', { ascending: false }).limit(50);
     for (const r of (data || []).reverse()) await publicShow(r, !!pubMyId && r.user_id === pubMyId);
