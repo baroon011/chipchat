@@ -12793,9 +12793,12 @@ function openMyStatus() {
     b.className = 'row';
     b.textContent = presLabel(k);
     b.addEventListener('click', async () => {
-      const { error } = await sbClient.rpc('set_status', { p_status: k });
+      let error = null;
+      try {
+        ({ error } = await sbClient.rpc('set_status', { p_status: k }));
+      } catch (e) { error = e; }
       appSettings.close();
-      if (error) alert(t('pv.reqFail'));
+      if (error) alert(t('pv.reqFail') + ': ' + (error.message || error));
       renderMyStatusBtn();
     });
     wrap.append(b);
