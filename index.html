@@ -7253,7 +7253,7 @@ function initFeed(root) {
   return {
     addPost({ text = '', files = [] } = {}) {
       if (feedServer.publish) {
-        feedServer.publish(text, files).then(() => feedServer.load && feedServer.load()).catch(() => {});
+        feedServer.publish(text, files).then(() => feedServer.load && feedServer.load()).catch((e) => alert(t('pv.reqFail') + ': ' + ((e && e.message) || e)));
         return;
       }
       const media = files.map((f) => ({
@@ -12805,6 +12805,9 @@ function openMyStatus() {
   }
   appSettings.openSheet(t('pres.mine'), wrap);
 }
+
+// زر "حالتي" في صفحتي يفتح لوحة النشر نفسها (صور، فيديو، كتابة) فتظهر لأصدقائي
+document.querySelector('.pf-story')?.addEventListener('click', () => composer.open());
 
 // ===== الإشعارات (الجرس): ما ينشره الأصدقاء والصفحات والقنوات التي أتابعها، من notif_list كما في القديم =====
 // زر البريد خاص بالاتصالات والمحادثات الخاصة فقط، والجرس للإشعارات
