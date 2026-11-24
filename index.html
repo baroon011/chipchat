@@ -12323,9 +12323,21 @@ async function chatMediaUrl(rid, mime) {
   }
 }
 // عرض رسالة عامة: نص، أو صورة إن كانت وسائطها صورة
+// اسم مرسل الرسالة العامة: إن لم يكن محفوظاً في الرسالة نجلبه من الملف الشخصي (مع تخزين مؤقت)
+const pubNickCache = new Map();
+async function pubNickOf(uid) {
+  if (!uid) return '';
+  if (pubNickCache.has(uid)) return pubNickCache.get(uid);
+  try {
+    const { data } = await sbClient.from('profiles').select('nick').eq('id', uid).maybeSingle();
+    const n = (data && data.nick) || '';
+    pubNickCache.set(uid, n);
+    return n;
+  } catch (e) { return ''; }
+}
 async function publicShow(r, self) {
   const mv = r.meta && r.meta.x && r.meta.x.media;
-  const name = r.nick || '?';
+  const name = r.nick || (await pubNickOf(r.user_id)) || '?';
   if (mv && mv.rid) {
     const isImg = /image/.test(String(mv.kind || mv.mime || '')) || /\.(png|jpe?g|gif|webp|avif|heic|bmp)$/i.test(String(mv.name || ''));
     const url = isImg ? await chatMediaUrl(mv.rid, mv.mime) : null;
