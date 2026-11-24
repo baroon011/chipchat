@@ -10746,8 +10746,17 @@ feedServer.load = async () => {
   if (!user) return;
   pfUid = user.id;
   const { data, error } = await sbClient.rpc('pp_feed', { lim: 30 });
-  if (error) return;
+  const dbgEl = document.getElementById('feedDbg') || (() => {
+    const x = document.createElement('p');
+    x.id = 'feedDbg';
+    x.style.cssText = 'font-size:12px;color:#6b5b85;margin:4px 16px;direction:rtl';
+    const fl = document.getElementById('feedList');
+    if (fl) fl.parentNode.insertBefore(x, fl);
+    return x;
+  })();
+  if (error) { dbgEl.textContent = 'خطأ الرئيسية: ' + error.message; return; }
   const rows = await pfEnrich(data || []);
+  dbgEl.textContent = 'تشخيص: رجع الخادم ' + rows.length + ' منشورًا، منها ' + rows.filter((r) => r.user_id !== user.id).length + ' لغيرك';
   feedLoad(rows, user.id);
   renderMyWall();
 };
