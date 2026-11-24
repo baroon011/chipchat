@@ -9990,6 +9990,366 @@ function initBack() {
   });
 }
 
+// الحالات (ستوري): شريط الدوائر في الصفحة الشخصية، والعارض الكامل مع الإعجاب والتعليق، ونافذة النشر.
+// الخادم: status_feed و status_publish و status_delete و status_like و status_comment، والتخزين في bucket اسمه statuses.
+// الدوال كلها تُمرَّر من app.js حتى تبقى هذه الوحدة مستقلة.
+
+const BG = {
+  p: 'linear-gradient(135deg,#7c1dff,#ff3df2)',
+  o: 'linear-gradient(135deg,#ff9f1a,#ff3df2)',
+  g: 'linear-gradient(135deg,#00b894,#0984e3)',
+  d: 'linear-gradient(135deg,#0c051e,#3a0ca3)',
+  y: 'linear-gradient(135deg,#ffd54a,#ff6b81)',
+};
+const TX = {
+  'st.mine': 'حالتي',
+  'st.textPh': 'اكتب حالتك...',
+  'st.photo': '📷 صورة',
+  'st.video': '🎬 فيديو',
+  'st.publish': 'نشر',
+  'st.title': 'نشر حالة',
+  'st.needText': 'اكتب نص الحالة أولاً',
+  'st.ready': 'تم اختيار',
+  'st.vidLong': 'الفيديو أطول من دقيقة',
+  'st.uploading': 'جارٍ رفع الملف…',
+  'st.publishing': 'جارٍ النشر…',
+  'st.done': 'تم نشر حالتك',
+  'st.deleted': 'تم حذف الحالة',
+  'st.failed': 'تعذّر',
+  'st.commentSent': 'تم إرسال التعليق',
+  'st.mediaErr': 'تعذّر تحميل الوسائط',
+};
+const MAX_VID_SEC = 60;
+const SEEN_KEY = 'cc_status_seen';
+
+const STATUS_CSS = `
+.st-strip{display:flex;gap:12px;overflow-x:auto;padding:8px 4px;scrollbar-width:none;direction:rtl}
+.st-strip::-webkit-scrollbar{display:none}
+.st-it{flex:0 0 auto;width:68px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit;position:relative}
+.st-ring{position:relative;width:58px;height:58px;border-radius:50%;padding:3px;box-sizing:border-box;background:linear-gradient(135deg,#ff3df2,#7c1dff)}
+.st-ring.seen{background:#cfc6dd}
+.st-ring img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #fff;display:block;box-sizing:border-box}
+.st-plus{position:absolute;bottom:-2px;inset-inline-end:-2px;width:22px;height:22px;border-radius:50%;background:#7c1dff;color:#fff;font-weight:800;font-size:15px;line-height:20px;text-align:center;border:2px solid #fff;box-sizing:border-box}
+.st-nm{font-size:11px;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-full{position:fixed;inset:0;z-index:9500;background:#000;color:#fff;direction:rtl;display:flex;flex-direction:column}
+.st-full[hidden]{display:none!important}
+.st-dots{display:flex;gap:4px;padding:10px 12px 0}
+.st-dots i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35)}
+.st-dots i.on{background:#fff}
+.st-hd{display:flex;align-items:center;gap:8px;padding:8px 12px}
+.st-hd img{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none}
+.st-hd b{flex:1;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-hd small{opacity:.8;font-size:12px}
+.st-x{width:36px;height:36px;border-radius:50%;border:1px solid #fff;background:rgba(0,0,0,.45);color:#fff;font-size:18px;cursor:pointer;padding:0}
+.st-media{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
+.st-media img,.st-media video{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.st-text{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box;text-align:center;font-size:26px;font-weight:900;color:#fff}
+.st-nav{position:absolute;top:0;bottom:0;width:30%;background:none;border:0;cursor:pointer;z-index:2}
+.st-nav.prev{left:0}
+.st-nav.next{right:0}
+.st-bar{display:flex;align-items:center;gap:10px;padding:10px 12px 18px}
+.st-bar input{flex:1;min-width:0;height:40px;border-radius:20px;border:1px solid #fff;background:rgba(0,0,0,.45);color:#fff;padding:0 14px;font-size:14px}
+.st-bar button{height:40px;min-width:40px;border-radius:20px;border:1px solid #fff;background:rgba(120,120,120,.55);color:#fff;font-size:16px;cursor:pointer;padding:0 10px}
+.st-bar button.on{background:linear-gradient(135deg,#ff3df2,#7c1dff)}
+.st-note{font-size:13px;opacity:.85;padding:0 12px 10px}
+.st-pub{display:flex;flex-direction:column;gap:10px;padding:4px 0}
+.st-pub textarea{min-height:110px;border-radius:14px;padding:12px;font:inherit;resize:vertical;width:100%;box-sizing:border-box}
+.st-pub .st-bgs{display:flex;gap:8px}
+.st-pub .st-bgs button{width:34px;height:34px;border-radius:50%;border:2px solid #fff;cursor:pointer;padding:0}
+.st-pub .st-bgs button.on{outline:2px solid #7c1dff}
+.st-pub .st-row{display:flex;gap:8px;flex-wrap:wrap}
+.st-pub .st-row button{flex:1;min-width:110px}
+`;
+
+function stTr(k) { return TX[k] || k; }
+
+function stEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// deps: { sb, getMyId(), getMyNick(), toast(msg), avatarMap(nicks) -> {nick: url}, timeAgo(iso), openSheet(title, el), closeSheet(), pickFile(accept) -> File|null }
+function initStatus(deps) {
+  const { sb, toast } = deps;
+  const style = document.createElement('style');
+  style.textContent = STATUS_CSS;
+  document.head.appendChild(style);
+
+  let groups = [];      // [{ uid, nick, avatar, items: [row] }] — حالتي أولاً
+  let meId = '';
+  let gi = 0;           // المجموعة الحالية في العارض
+  let si = 0;           // الحالة الحالية داخل المجموعة
+  let urlCache = {};
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (e) { seen = {}; }
+  const markSeen = (id) => {
+    seen[id] = 1;
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) { /* التخزين المحلي اختياري */ }
+  };
+
+  // ----- الشريط -----
+  const strip = document.createElement('div');
+  strip.className = 'st-strip';
+  strip.id = 'stStrip';
+
+  async function load() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    meId = user.id;
+    const { data, error } = await sb.rpc('status_feed');
+    if (error) { console.warn('status_feed', error.message); return; }
+    const rows = Array.isArray(data) ? data : [];
+    const map = {};
+    const order = [];
+    rows.forEach((r) => {
+      const k = r.owner_uid;
+      if (!map[k]) { map[k] = { uid: k, nick: r.nick || '', items: [] }; order.push(k); }
+      map[k].items.push(r);
+    });
+    const avatars = await deps.avatarMap(order.map((k) => map[k].nick));
+    groups = order.map((k) => ({ ...map[k], avatar: avatars[map[k].nick] || '' }));
+    groups.sort((a, b) => (a.uid === meId ? -1 : 0) - (b.uid === meId ? -1 : 0));
+    render();
+  }
+
+  const unseen = (g) => g.items.some((r) => !seen[r.id]);
+
+  function render() {
+    const me = meId;
+    const mine = groups.find((g) => g.uid === me);
+    const mineUn = mine ? unseen(mine) : false;
+    const myAv = mine ? mine.avatar : '';
+    strip.innerHTML =
+      '<button class="st-it" id="stMine" type="button"><span class="st-ring' + (mineUn ? '' : ' seen') + '">' +
+      (myAv ? '<img src="' + stEsc(myAv) + '" alt="">' : '') +
+      '<span class="st-plus">+</span></span><span class="st-nm">' + stEsc(stTr('st.mine')) + '</span></button>' +
+      groups.filter((g) => g.uid !== me).map((g, i) =>
+        '<button class="st-it" data-st="' + i + '" type="button"><span class="st-ring' + (unseen(g) ? '' : ' seen') + '">' +
+        (g.avatar ? '<img src="' + stEsc(g.avatar) + '" alt="">' : '') +
+        '</span><span class="st-nm">' + stEsc(g.nick) + '</span></button>').join('');
+    strip.querySelector('#stMine').onclick = (e) => {
+      e.stopPropagation();
+      if (mine && mine.items.length) openAt(groups.indexOf(mine), 0);
+      else openPublish();
+    };
+    strip.querySelector('.st-plus')?.addEventListener('click', (e) => { e.stopPropagation(); openPublish(); });
+    strip.querySelectorAll('[data-st]').forEach((b) => {
+      const g = groups.filter((x) => x.uid !== me)[+b.dataset.st];
+      b.onclick = () => openAt(groups.indexOf(g), 0);
+    });
+  }
+
+  // ----- العارض -----
+  const full = document.createElement('div');
+  full.className = 'st-full';
+  full.hidden = true;
+  full.innerHTML =
+    '<div class="st-dots"></div>' +
+    '<div class="st-hd"><img alt=""><div style="flex:1;min-width:0"><b></b><br><small></small></div>' +
+    '<button class="st-x" type="button">✕</button></div>' +
+    '<div class="st-media"><button class="st-nav prev" type="button" aria-label="السابق"></button><button class="st-nav next" type="button" aria-label="التالي"></button></div>' +
+    '<div class="st-note"></div>' +
+    '<div class="st-bar"><input id="stCmI" type="text" placeholder=""><button id="stRL" type="button">♡</button><span id="stRLn"></span><button id="stRCn" type="button" style="border:0">💬</button><button id="stCmS" type="button">➤</button></div>';
+  document.body.appendChild(full);
+
+  const $f = (sel) => full.querySelector(sel);
+  $f('.st-x').onclick = closeFull;
+  $f('.st-nav.prev').onclick = () => prevStatus();
+  $f('.st-nav.next').onclick = () => nextStatus();
+  $f('#stRL').onclick = toggleLike;
+  $f('#stCmS').onclick = sendComment;
+  $f('#stRCn').onclick = () => $f('#stCmI').focus();
+  $f('#stCmI').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendComment(); });
+
+  function openAt(gIndex, idx) {
+    if (gIndex < 0 || !groups[gIndex]) return;
+    gi = gIndex;
+    si = idx || 0;
+    full.hidden = false;
+    showCur();
+  }
+  function closeFull() {
+    full.hidden = true;
+    const m = full.querySelector('.st-media');
+    m.querySelectorAll('video').forEach((v) => v.pause());
+    load();
+  }
+  const cur = () => (groups[gi] && groups[gi].items[si]) || null;
+
+  function nextStatus() {
+    const g = groups[gi];
+    if (!g) return;
+    if (si < g.items.length - 1) { si++; showCur(); return; }
+    if (gi < groups.length - 1) { gi++; si = 0; showCur(); return; }
+    closeFull();
+  }
+  function prevStatus() {
+    if (si > 0) { si--; showCur(); return; }
+    if (gi > 0) { gi--; si = groups[gi].items.length - 1; showCur(); }
+  }
+
+  async function mediaUrl(r) {
+    if (!r.media_path) return null;
+    if (urlCache[r.id]) return urlCache[r.id];
+    const { data } = await sb.storage.from('statuses').createSignedUrl(r.media_path, 600);
+    const u = data && data.signedUrl;
+    if (u) urlCache[r.id] = u;
+    return u || null;
+  }
+
+  async function showCur() {
+    const g = groups[gi];
+    const r = cur();
+    if (!g || !r) { closeFull(); return; }
+    markSeen(r.id);
+    full.querySelector('.st-hd img').src = g.avatar || '';
+    full.querySelector('.st-hd b').textContent = g.nick;
+    full.querySelector('.st-hd small').textContent = deps.timeAgo(r.created_at);
+    full.querySelector('.st-dots').innerHTML = g.items.map((_, i) => '<i class="' + (i === si ? 'on' : '') + '"></i>').join('');
+    $f('#stRL').textContent = r.liked ? '❤️' : '♡';
+    $f('#stRL').className = r.liked ? 'on' : '';
+    $f('#stRLn').textContent = r.likes || '';
+    $f('#stRCn').textContent = r.comments ? '💬 ' + r.comments : '💬';
+    $f('#stCmI').value = '';
+    $f('.st-note').textContent = '';
+    const media = full.querySelector('.st-media');
+    media.querySelectorAll('.st-content').forEach((n) => n.remove());
+    const box = document.createElement('div');
+    box.className = 'st-content';
+    box.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1';
+    media.append(box);
+    if (r.kind === 'text') {
+      box.innerHTML = '<div class="st-text" style="background:' + (BG[r.bg] || BG.p) + '">' + stEsc(r.body || '') + '</div>';
+      return;
+    }
+    box.innerHTML = '<div style="opacity:.6">…</div>';
+    const u = await mediaUrl(r);
+    if (cur() !== r) return;
+    if (r.kind === 'image' && u) box.innerHTML = '<img src="' + stEsc(u) + '" alt="">';
+    else if (r.kind === 'video' && u) box.innerHTML = '<video src="' + stEsc(u) + '" controls playsinline autoplay></video>';
+    else box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('st.mediaErr')) + '</div>';
+  }
+
+  async function toggleLike() {
+    const r = cur();
+    if (!r) return;
+    const on = !r.liked;
+    const { error } = await sb.rpc('status_like', { p_id: r.id, p_on: on });
+    if (error) { $f('.st-note').textContent = stTr('st.failed') + ': ' + error.message; return; }
+    r.liked = on;
+    r.likes = Math.max(0, (r.likes || 0) + (on ? 1 : -1));
+    showCur();
+  }
+
+  async function sendComment() {
+    const r = cur();
+    const inp = $f('#stCmI');
+    const text = (inp.value || '').trim();
+    if (!r || !text) return;
+    const { error } = await sb.rpc('status_comment', { p_id: r.id, p_body: text });
+    if (error) { $f('.st-note').textContent = stTr('st.failed') + ': ' + error.message; return; }
+    r.comments = (r.comments || 0) + 1;
+    inp.value = '';
+    $f('.st-note').textContent = stTr('st.commentSent');
+    $f('#stRCn').textContent = '💬 ' + r.comments;
+  }
+
+  // ----- نافذة النشر -----
+  function openPublish() {
+    const wrap = document.createElement('div');
+    wrap.className = 'st-pub';
+    let bg = 'p';
+    let pending = null; // { file, kind, ext }
+    wrap.innerHTML =
+      '<textarea placeholder="' + stEsc(stTr('st.textPh')) + '"></textarea>' +
+      '<div class="st-bgs">' + Object.keys(BG).map((k) => '<button type="button" data-bg="' + k + '" style="background:' + BG[k] + '"' + (k === bg ? ' class="on"' : '') + '></button>').join('') + '</div>' +
+      '<div class="st-row"><button type="button" data-k="image">' + stEsc(stTr('st.photo')) + '</button><button type="button" data-k="video">' + stEsc(stTr('st.video')) + '</button></div>' +
+      '<div class="st-row"><button type="button" class="app-save" data-k="publish">' + stEsc(stTr('st.publish')) + '</button></div>' +
+      '<p class="st-note" style="opacity:.8;margin:0"></p>';
+    const note = wrap.querySelector('.st-note');
+    const ta = wrap.querySelector('textarea');
+    wrap.querySelectorAll('[data-bg]').forEach((b) => b.addEventListener('click', () => {
+      bg = b.dataset.bg;
+      wrap.querySelectorAll('[data-bg]').forEach((x) => x.classList.toggle('on', x === b));
+    }));
+    wrap.querySelectorAll('[data-k="image"],[data-k="video"]').forEach((b) => b.addEventListener('click', async () => {
+      const k = b.dataset.k;
+      const f = await deps.pickFile(k === 'image' ? 'image/*' : 'video/*');
+      if (!f) return;
+      if (k === 'video') {
+        const sec = await videoSeconds(f);
+        if (!isFinite(sec) || sec > MAX_VID_SEC + 0.5) { note.textContent = stTr('st.vidLong'); pending = null; return; }
+      }
+      pending = { file: f, kind: k, ext: (f.name.split('.').pop() || (k === 'image' ? 'jpg' : 'mp4')).toLowerCase() };
+      note.textContent = stTr('st.ready') + ': ' + f.name;
+    }));
+    wrap.querySelector('[data-k="publish"]').addEventListener('click', () => {
+      const body = ta.value.trim();
+      if (pending) return publish({ kind: pending.kind, body, bg, note, file: pending.file, ext: pending.ext });
+      if (!body) { note.textContent = stTr('st.needText'); return; }
+      return publish({ kind: 'text', body, bg, note });
+    });
+    deps.openSheet(stTr('st.title'), wrap);
+  }
+
+  async function publish({ kind, body, bg, note, file, ext }) {
+    try {
+      const me = meId;
+      let path = null;
+      if (kind !== 'text') {
+        note.textContent = stTr('st.uploading');
+        path = me + '/' + Date.now() + '.' + ext;
+        const up = await sb.storage.from('statuses').upload(path, file, { contentType: file.type, upsert: false });
+        if (up.error) throw up.error;
+      }
+      note.textContent = stTr('st.publishing');
+      const { data, error } = await sb.rpc('status_publish', { p_kind: kind, p_body: body || null, p_bg: kind === 'text' ? bg : null, p_path: path });
+      if (error) {
+        if (path) sb.storage.from('statuses').remove([path]);
+        throw error;
+      }
+      const old = (data && data.old_paths) || [];
+      if (old.length) sb.storage.from('statuses').remove(old);
+      deps.closeSheet();
+      toast(stTr('st.done'));
+      load();
+    } catch (e) {
+      note.textContent = stTr('st.failed') + ': ' + (e.message || e);
+    }
+  }
+
+  // حالاتي: حذفها من قائمة الحالة (يُستدعى من زر الحذف عند الحاجة)
+  async function removeMine() {
+    const { data, error } = await sb.rpc('status_delete');
+    if (error) { toast(stTr('st.failed') + ': ' + error.message); return; }
+    const old = data || [];
+    if (old.length) sb.storage.from('statuses').remove(old);
+    toast(stTr('st.deleted'));
+    load();
+  }
+
+  function videoSeconds(file) {
+    return new Promise((res) => {
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); res(v.duration); };
+      v.onerror = () => { URL.revokeObjectURL(v.src); res(NaN); };
+      v.src = URL.createObjectURL(file);
+    });
+  }
+
+  return {
+    // يركّب الشريط داخل الحاوية المعطاة ويحمّل الحالات
+    mount(container) {
+      container.append(strip);
+      load();
+    },
+    load,
+    openPublish,
+    removeMine,
+  };
+}
+
+
 
 
 
@@ -10612,6 +10972,7 @@ function showHome(welcomeName) {
   loadFriendsServer();
   renderLockBtn();
   renderMyStatusBtn();
+  statusApi.load();
   startNotifications();
   startMusicRealtime();
   // بعد الدخول تظهر الصفحة الشخصية مباشرة (الغلاف والمربعات والحائط)
@@ -12768,7 +13129,26 @@ function openMyStatus() {
 }
 
 // زر "حالتي" في صفحتي يفتح لوحة النشر نفسها (صور، فيديو، كتابة) فتظهر لأصدقائي
-document.querySelector('.pf-story')?.addEventListener('click', () => composer.open());
+// الحالات: شريط الدوائر داخل الصفحة الشخصية (حالتي + أصدقائي)، والنشر من الدائرة نفسها
+const pfStoryOld = document.querySelector('.pf-story');
+if (pfStoryOld) pfStoryOld.hidden = true;
+const statusApi = initStatus({
+  sb: sbClient,
+  getMyId: () => pubMyId || '',
+  toast: (m) => alert(m),
+  timeAgo: (iso) => timeAgo(iso),
+  avatarMap: (nicks) => avatarsByNick(nicks),
+  openSheet: (title, el) => appSettings.openSheet(title, el),
+  closeSheet: () => appSettings.close(),
+  pickFile: (accept) => new Promise((resolve) => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = accept;
+    inp.onchange = () => resolve(inp.files && inp.files[0] ? inp.files[0] : null);
+    inp.click();
+  }),
+});
+if (pfStoryOld) statusApi.mount(pfStoryOld.parentElement);
 
 // ===== الإشعارات (الجرس): ما ينشره الأصدقاء والصفحات والقنوات التي أتابعها، من notif_list كما في القديم =====
 // زر البريد خاص بالاتصالات والمحادثات الخاصة فقط، والجرس للإشعارات
@@ -12827,32 +13207,44 @@ function avatarChip(name, src) {
   return a;
 }
 
+// فتح المنشور من الإشعار: يعود للرئيسية ويمرّر إلى البطاقة ويفتح التعليقات عند التعليق
+function openPostFromNotif(pid, kind) {
+  appSettings.close();
+  pfPage.hidden = true;
+  chatView.hidden = true;
+  homeTop.hidden = false;
+  feedView.hidden = false;
+  barEl.hidden = false;
+  sidebar.setEnabled(false);
+  bar.setActive('discover');
+  let tries = 0;
+  const find = () => {
+    const card = document.querySelector('#feedList .ppCard[data-pid="' + CSS.escape(String(pid)) + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (kind === 'comment' || kind === 'reply') {
+        const cb = card.querySelector('[data-act="cm"]');
+        if (cb) setTimeout(() => cb.click(), 500);
+      }
+      return;
+    }
+    if (++tries < 20) { setTimeout(find, 300); return; }
+    alert('المنشور لم يعد موجوداً أو لم يُحمَّل بعد');
+  };
+  find();
+}
+
 async function openNotifications() {
   const wrap = document.createElement('div');
   const r = await sbClient.rpc('notif_list', { lim: 40 });
-  const rows = (!r.error && r.data) || [];
-  // الرسائل الخاصة الأخيرة تظهر في الجرس كما في القديم
-  Object.values(dmThreads).sort((a, b) => b.at - a.at).slice(0, 10).forEach((th) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'row';
-    const txt = document.createElement('span');
-    txt.textContent = (th.name || '?') + ': ' + (th.preview || '');
-    b.append(txt);
-    const when = document.createElement('small');
-    when.textContent = th.time;
-    b.append(when);
-    b.addEventListener('click', () => dm.openChat({ id: th.id, name: th.name }));
-    wrap.append(b);
-  });
-  if (!rows.length && !Object.keys(dmThreads).length) wrap.append(pickNote(t('notif.none')));
+  const rows = ((!r.error && r.data) || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (!rows.length) wrap.append(pickNote(t('notif.none')));
   const pics = await avatarsByNick(rows.map((n) => n.actor_nick));
   for (const n of rows) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'row';
     b.style.opacity = n.read ? '0.6' : '1';
-    // صورة صاحب الإشعار بجانب النص (أو حرفه الأول إن لم توجد صورة)
     const nick = n.actor_nick || '?';
     const body = n.body ? ': ' + n.body : '';
     b.append(avatarChip(nick, pics[nick]));
@@ -12864,6 +13256,10 @@ async function openNotifications() {
       when.textContent = timeAgo(n.created_at);
       b.append(when);
     }
+    b.addEventListener('click', () => {
+      if (n.kind === 'fr_req' || n.kind === 'fr_acc') { appSettings.close(); openFriendsSheet(); return; }
+      if (n.ref_id) openPostFromNotif(n.ref_id, n.kind);
+    });
     wrap.append(b);
   }
   appSettings.openSheet(t('notif.title'), wrap);
