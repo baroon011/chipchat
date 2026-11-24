@@ -10126,6 +10126,7 @@ function initStatus(deps) {
     render();
   }
 
+  let mineOnly = false;
   const unseen = (g) => g.items.some((r) => !seen[r.id]);
 
   function render() {
@@ -10137,7 +10138,7 @@ function initStatus(deps) {
       '<button class="st-it" id="stMine" type="button"><span class="st-ring' + (mineUn ? '' : ' seen') + '">' +
       (myAv ? '<img src="' + stEsc(myAv) + '" alt="">' : '') +
       '<span class="st-plus">+</span></span><span class="st-nm">' + stEsc(stTr('status.mine')) + '</span></button>' +
-      groups.filter((g) => g.uid !== me).map((g, i) =>
+      (mineOnly ? [] : groups.filter((g) => g.uid !== me)).map((g, i) =>
         '<button class="st-it" data-st="' + i + '" type="button"><span class="st-ring' + (unseen(g) ? '' : ' seen') + '">' +
         (g.avatar ? '<img src="' + stEsc(g.avatar) + '" alt="">' : '') +
         '</span><span class="st-nm">' + stEsc(g.nick) + '</span></button>').join('');
@@ -10446,7 +10447,8 @@ function initStatus(deps) {
 
   return {
     // يركّب الشريط داخل الحاوية المعطاة ويحمّل الحالات
-    mount(container) {
+    mount(container, opts = {}) {
+      mineOnly = !!opts.mineOnly;
       container.append(strip);
       load();
     },
@@ -13355,11 +13357,11 @@ const statusApi = initStatus({
     inp.click();
   }),
 });
-// شريط الحالات أسفل المربعات الثلاث في الصفحة الشخصية، كما رُتّب
+// الملف الشخصي: زر حالتي فقط، دون أسماء الأصدقاء
 if (pfStoryOld) {
   const slot = pfStoryOld.parentElement;
   slot.style.cssText = 'display:block;width:100%';
-  statusApi.mount(slot);
+  statusApi.mount(slot, { mineOnly: true });
 }
 
 // ===== الإشعارات (الجرس): ما ينشره الأصدقاء والصفحات والقنوات التي أتابعها، من notif_list كما في القديم =====
