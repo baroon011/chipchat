@@ -2698,29 +2698,19 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 }
 #feedList .ppCard:last-child { border-bottom: 0; }
 
-/* خيط نيون حول الوسائط والمنشورات النصية، بلون الثيم المستخدم */
-#pfWall .ppCard :is(img, video):not(.ppAv img),
-#feedList .ppCard :is(img, video):not(.ppAv img) {
-  border-radius: 14px;
-  box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 60%, transparent);
-}
-#pfWall .ppTx,
-#feedList .ppTx {
+/* منشور واحد = صندوق واحد بخيط نيون يحيط النص والصورة/الفيديو معاً */
+.ppBox {
   padding: 12px 14px;
   border-radius: 14px;
   box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 55%, transparent);
 }
+.ppBox .ppTx { padding: 0; box-shadow: none; border-radius: 0; }
+.ppBox .ppMedia { margin-top: 0; box-shadow: none; }
+.ppBox .ppTx + .ppMedia { margin-top: 10px; }
+.ppBox .ppMedia + .ppMedia { margin-top: 8px; }
 
-/* خيط النيون نفسه لمنشورات الصفحة الشخصية */
-.pv-posts .ppCard :is(img, video):not(.ppAv img) {
-  border-radius: 14px;
-  box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 60%, transparent);
-}
-.pv-posts .ppTx {
-  padding: 12px 14px;
-  border-radius: 14px;
-  box-shadow: 0 0 0 1.5px var(--neon, var(--pink)), 0 0 12px 1px color-mix(in srgb, var(--neon, var(--pink)) 55%, transparent);
-}
+/* الرئيسية داخل الصفحة الأساسية: تتمرّر مع الصفحة نفسها بدون تمرير داخلي */
+.pf-page .feed-view { flex: none; overflow: visible; padding: 8px 0 24px; }
 
 /* الإعدادات واكتشف: قوائم الإعدادات، حالة الاتصال، زر كن نجماً */
 /* الملف الشخصي فوق الإعدادات عشان زر صاحب الصفحة يفتحه وزر الرجوع يرجع للإعدادات */
@@ -3348,11 +3338,11 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
         <div class="feed-list" id="pfWall">
           <p class="chat-empty" data-i18n="feed.empty"></p>
         </div>
+        <section class="feed-view" id="feedView">
+          <div class="feed-list" id="feedList"></div>
+        </section>
       </section>
 
-      <section class="feed-view" id="feedView" hidden>
-        <div class="feed-list" id="feedList"></div>
-      </section>
       <section class="chat-view" id="chatView" hidden>
         <header class="chat-head">
           <h2 id="chatTitle" data-i18n="room.general"></h2>
@@ -6893,8 +6883,10 @@ function feedPostEl(p) {
   hd.append(av, feedMk('span', '', `${feedName(p.nick)} • ${timeAgo(p.at)}`));
   card.append(hd);
 
+  // النص والوسائط داخل صندوق واحد عليه خيط النيون، فيبدوان منشوراً واحداً
+  const box = feedMk('div', 'ppBox');
   const body = feedText(p);
-  if (body) card.append(feedMk('div', 'ppTx', body));
+  if (body) box.append(feedMk('div', 'ppTx', body));
   for (const m of p.media) {
     const node = feedMk(m.type === 'video' ? 'video' : 'img', 'ppMedia');
     node.src = m.url;
@@ -6904,8 +6896,9 @@ function feedPostEl(p) {
     } else {
       node.alt = '';
     }
-    card.append(node);
+    box.append(node);
   }
+  if (box.childElementCount) card.append(box);
 
   const act = feedMk('div', 'ppAct');
   act.append(
@@ -7219,7 +7212,7 @@ function feedRenderInto(root, posts) {
 }
 
 function feedRender() {
-  if (feedList) feedRenderInto(feedList, feedPosts);
+  if (feedList) feedRenderInto(feedList, feedPosts.filter((p) => p.nick !== FEED_ME));
   if (wallList) feedRenderInto(wallList, feedPosts.filter((p) => p.nick === FEED_ME));
   feedSideRedraw();
 }
@@ -10499,7 +10492,7 @@ document.getElementById('dscBack').addEventListener('click', () => goHome());
 
 // الرئيسية في الشريط العلوي: الشاشة الرئيسية (الشريط العلوي والسفلي وزر النشر) زي أول ما بتدخل
 function goHome() {
-  feedView.hidden = true;
+  feedView.hidden = false;
   profile.close();
   chatView.hidden = true;
   pfPage.hidden = false;
@@ -10913,10 +10906,12 @@ const composer = initComposer({
   onPublish: (post) => {
     feed.addPost(post);
     chatView.hidden = true;
+    pfPage.hidden = false;
+    homeTop.hidden = true;
     feedView.hidden = false;
     barEl.hidden = false;
     sidebar.setEnabled(false);
-    bar.setActive('discover');
+    bar.setActive('profile');
   },
   onLive: () => call.live(),
 });
@@ -10930,9 +10925,10 @@ const bar = initBottomBar({
     sidebar.setEnabled(false);
     chatView.hidden = true;
     // الصفحة الشخصية تبقى ظاهرة تحت الإعدادات، فعند إغلاقها تظهر مباشرة
-    pfPage.hidden = key !== 'profile';
-    homeTop.hidden = key === 'profile';
-    feedView.hidden = key !== 'discover';
+    // الصفحة الأساسية واحدة: الصفحة الشخصية والحائط والمناشير داخلها
+    pfPage.hidden = key !== 'profile' && key !== 'discover';
+    homeTop.hidden = true;
+    feedView.hidden = false;
     barEl.hidden = false;
     if (key === 'discover') discover.open();
     if (key === 'post') composer.open();
@@ -13210,13 +13206,13 @@ function avatarChip(name, src) {
 // فتح المنشور من الإشعار: يعود للرئيسية ويمرّر إلى البطاقة ويفتح التعليقات عند التعليق
 function openPostFromNotif(pid, kind) {
   appSettings.close();
-  pfPage.hidden = true;
+  pfPage.hidden = false;
   chatView.hidden = true;
-  homeTop.hidden = false;
+  homeTop.hidden = true;
   feedView.hidden = false;
   barEl.hidden = false;
   sidebar.setEnabled(false);
-  bar.setActive('discover');
+  bar.setActive('profile');
   let tries = 0;
   const find = () => {
     const card = document.querySelector('#feedList .ppCard[data-pid="' + CSS.escape(String(pid)) + '"]');
