@@ -2485,6 +2485,22 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 .feat-tx { display: flex; flex-direction: column; min-width: 0; }
 .feat-tx strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feat-tx small { font-size: 12px; opacity: 0.7; }
+
+/* مشغّل الوسائط الموحّد (js/player.js) */
+.pl-wrap { display: flex; flex-direction: column; background: #000; color: #fff; border-radius: 12px; overflow: hidden; width: 100%; max-width: 100%; }
+.pl-wrap.pl-audio { background: rgba(255,255,255,0.8); color: inherit; }
+.pl-media { display: block; width: 100%; max-height: 62vh; object-fit: contain; background: #000; }
+.st-content .pl-wrap { position: absolute; inset: 0; border-radius: 0; pointer-events: auto; justify-content: center; }
+.st-content .pl-media { flex: 1; min-height: 0; max-height: none; }
+.pl-el { display: none; }
+.pl-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(0,0,0,0.75); }
+.pl-wrap.pl-audio .pl-bar { background: none; }
+.pl-btn { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.12); color: inherit; font-size: 15px; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.pl-seek { flex: 1; min-width: 0; accent-color: #e040fb; }
+.pl-time { flex: none; font-size: 12px; font-variant-numeric: tabular-nums; direction: ltr; }
+.pl-note { padding: 0 10px 6px; font-size: 11px; opacity: 0.7; }
+.pl-wrap.pl-audio .pl-media, .pl-wrap.pl-audio .pl-note { display: none; }
+.pl-wrap.pl-audio .pl-el { display: block; width: 0; height: 0; }
 .chan-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; }
 .chan-ov-box { background: var(--surface); color: var(--ink); border-radius: 18px; padding: 14px; width: min(92vw, 380px); max-height: 80vh; overflow-y: auto; }
 .chan-ov-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
@@ -9991,6 +10007,105 @@ function initBack() {
   });
 }
 
+// مشغّل وسائط موحّد للتطبيق: فيديو وصوت، بأزرار مرسومة داخل التطبيق (لا تعتمد على مشغّل المتصفح)
+// الاستخدام: const p = mountPlayer(container, url, { kind: 'video' | 'audio', muted, autoplay });
+function mountPlayer(host, src, opts = {}) {
+  const isVideo = opts.kind !== 'audio';
+  const wrap = document.createElement('div');
+  wrap.className = 'pl-wrap' + (isVideo ? '' : ' pl-audio');
+
+  const media = document.createElement(isVideo ? 'video' : 'audio');
+  media.className = isVideo ? 'pl-media' : 'pl-el';
+  media.preload = 'metadata';
+  media.playsInline = true;
+  media.src = src;
+  if (opts.muted) media.muted = true;
+
+  const bar = document.createElement('div');
+  bar.className = 'pl-bar';
+  const mkBtn = (txt, title) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pl-btn';
+    b.textContent = txt;
+    if (title) b.title = title;
+    return b;
+  };
+  const playBtn = mkBtn('▶', 'تشغيل');
+  const seek = document.createElement('input');
+  seek.type = 'range';
+  seek.min = '0';
+  seek.max = '1000';
+  seek.value = '0';
+  seek.className = 'pl-seek';
+  const time = document.createElement('span');
+  time.className = 'pl-time';
+  time.textContent = '0:00';
+  const muteBtn = mkBtn(media.muted ? '🔇' : '🔊', 'صوت');
+  bar.append(playBtn, seek, time, muteBtn);
+  let fullBtn = null;
+  if (isVideo) {
+    fullBtn = mkBtn('⛶', 'ملء الشاشة');
+    bar.append(fullBtn);
+  }
+  const note = document.createElement('div');
+  note.className = 'pl-note';
+
+  wrap.append(media, bar, note);
+  host.replaceChildren(wrap);
+
+  const fmt = (s) => {
+    if (!isFinite(s) || s < 0) return '0:00';
+    const m = Math.floor(s / 60);
+    const r = Math.floor(s % 60);
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  };
+  const togglePlay = () => {
+    if (media.ended) media.currentTime = 0;
+    if (media.paused) {
+      const p = media.play();
+      if (p && p.catch) p.catch((e) => { note.textContent = 'تعذّر التشغيل' + (e && e.name ? ' (' + e.name + ')' : ''); });
+    } else media.pause();
+  };
+
+  playBtn.addEventListener('click', togglePlay);
+  if (isVideo) media.addEventListener('click', togglePlay);
+  muteBtn.addEventListener('click', () => {
+    media.muted = !media.muted;
+    muteBtn.textContent = media.muted ? '🔇' : '🔊';
+  });
+  seek.addEventListener('input', () => {
+    if (media.duration) media.currentTime = (media.duration * Number(seek.value)) / 1000;
+  });
+  if (fullBtn) {
+    fullBtn.addEventListener('click', () => {
+      const r = media.requestFullscreen ? media.requestFullscreen() : (media.webkitEnterFullscreen && media.webkitEnterFullscreen());
+      if (r && r.catch) r.catch(() => {});
+    });
+  }
+
+  media.addEventListener('timeupdate', () => {
+    if (media.duration) seek.value = String(Math.round((media.currentTime / media.duration) * 1000));
+    time.textContent = fmt(media.currentTime) + ' / ' + fmt(media.duration);
+  });
+  media.addEventListener('loadedmetadata', () => {
+    time.textContent = '0:00 / ' + fmt(media.duration);
+    if (isVideo) note.textContent = media.videoWidth + 'x' + media.videoHeight;
+  });
+  media.addEventListener('play', () => { playBtn.textContent = '❚❚'; playBtn.title = 'إيقاف مؤقت'; });
+  media.addEventListener('pause', () => { playBtn.textContent = '▶'; playBtn.title = 'تشغيل'; });
+  media.addEventListener('ended', () => { playBtn.textContent = '↻'; playBtn.title = 'إعادة'; });
+  media.addEventListener('error', () => {
+    note.textContent = 'تعذّر تحميل الملف (' + (media.error ? media.error.code : '?') + ')';
+  });
+
+  if (opts.autoplay) {
+    const p = media.play();
+    if (p && p.catch) p.catch(() => {});
+  }
+  return { wrap, media, stop: () => media.pause() };
+}
+
 // الحالات (ستوري): شريط الدوائر في الصفحة الشخصية، والعارض الكامل مع الإعجاب والتعليق، ونافذة النشر.
 // الخادم: status_feed و status_publish و status_delete و status_like و status_comment، والتخزين في bucket اسمه statuses.
 // الدوال كلها تُمرَّر من app.js حتى تبقى هذه الوحدة مستقلة.
@@ -10260,16 +10375,8 @@ function initStatus(deps) {
     else if (r.kind === 'video' && u) {
       // مشغّل المتصفح الأصلي مع أزرار التحكم الظاهرة دائماً (تشغيل، صوت، ملء الشاشة)،
       // والمشغل يبدأ مكتوماً ليعمل التشغيل التلقائي، ويمكن رفع الصوت من أزرار التحكم
-      box.innerHTML = '<video controls muted playsinline preload="auto" src="' + stEsc(u) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;pointer-events:auto"></video>' +
-        '<div class="st-vdiag" style="position:absolute;left:8px;top:8px;right:8px;color:#fff;font-size:12px;background:rgba(0,0,0,.55);padding:4px 8px;border-radius:8px;pointer-events:none"></div>';
-      const v = box.querySelector('video');
-      const dg = box.querySelector('.st-vdiag');
-      // تشخيص يظهر داخل الشاشة: أبعاد الفيديو وحالة التشغيل، أو سبب الخطأ
-      const info = () => 'فيديو: ' + v.videoWidth + 'x' + v.videoHeight + ' · حالة ' + v.readyState + (v.paused ? ' · متوقف' : ' · يعمل');
-      v.addEventListener('loadedmetadata', () => { dg.textContent = info(); });
-      v.addEventListener('playing', () => { dg.textContent = info(); });
-      v.addEventListener('error', () => { dg.textContent = stTr('status.playErr') + (v.error ? ' (' + v.error.code + ')' : ''); });
-      v.play().catch(() => { dg.textContent = info(); });
+      // مشغّل التطبيق الموحّد (player.js): أزرار ثابتة، يبدأ مكتوماً تلقائياً
+      mountPlayer(box, u, { kind: 'video', muted: true, autoplay: true });
     }
     else box.innerHTML = '<div style="opacity:.6">' + stEsc(stTr('status.mediaErr')) + '</div>';
   }
@@ -12373,6 +12480,10 @@ async function loadFeaturedDiscover() {
     head.className = 'app-note';
     head.textContent = '⭐ ' + t('disc.featured');
     discFeat.append(head);
+    // رسالة النتيجة تظهر هنا داخل صفحة البحث (وليس في صفحة القنوات حيث رسائل discMsg)
+    const featMsg = document.createElement('p');
+    featMsg.className = 'app-note';
+    const featSay = (m) => { featMsg.textContent = m || ''; };
     rows.forEach((x) => {
       // بطاقة واضحة لكل قناة: أيقونة، الاسم، ثم المالك وعدد المتابعين
       const b = document.createElement('button');
@@ -12390,12 +12501,16 @@ async function loadFeaturedDiscover() {
       tx.append(nm, sm);
       b.append(ic, tx);
       b.addEventListener('click', async () => {
-        const { data, error } = await sbClient.from('chans').select('code').eq('id', x.cid).maybeSingle();
-        if (error) { discSay(error.message); return; }
-        if (data && data.code) chanJoinByCode(data.code); else discSay(t('chan.badCode'));
+        featSay('…');
+        const { data: found, error } = await sbClient.from('chans').select('id,code').eq('id', x.cid).maybeSingle();
+        if (error || !found || !found.code) { featSay(error ? error.message : t('chan.badCode')); return; }
+        const r = await sbClient.rpc('join_chan', { cid: found.id, c: found.code, frm: '' });
+        if (r.error) { featSay(/banned/i.test(r.error.message || '') ? t('chan.banned') : t('chan.badCode') + ': ' + r.error.message); return; }
+        if (r.data === 'member') { featSay(t('chan.joined')); loadMyChannels(); } else featSay(t('chan.pending'));
       });
       discFeat.append(b);
     });
+    discFeat.append(featMsg);
   } catch (e) { /* القائمة اختيارية */ }
 }
 discQ.addEventListener('keydown', (e) => { if (e.key === 'Enter') discSearch(); });
