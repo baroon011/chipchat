@@ -7205,7 +7205,9 @@ function feedRender() {
 function feedSideRedraw() {
   document.querySelectorAll('.pv-posts .ppCard').forEach((el) => {
     const p = feedSide.get(el.dataset.pid);
-    if (!p || el.contains(document.activeElement)) return;
+    const af = document.activeElement;
+    // نتجنب الرسم فقط عندما تكون الكتابة جارية داخل البطاقة، لا عند الضغط على زر
+    if (!p || (af && el.contains(af) && (af.tagName === 'TEXTAREA' || af.tagName === 'INPUT'))) return;
     el.replaceWith(feedSideCard(p));
   });
 }
@@ -7220,10 +7222,11 @@ function initFeed(root) {
   feedList.addEventListener('click', feedClick);
   document.addEventListener('langchange', feedRender);
   feedRender();
+  // تحديث الرئيسية من الخادم دورياً حتى تظهر منشورات الأصدقاء الجديدة دون إعادة تحميل الصفحة
   setInterval(() => {
     if (feedList.closest('[hidden]') || document.activeElement?.dataset?.cmInput) return;
-    feedRender();
-  }, 60000);
+    if (feedServer.load) feedServer.load(); else feedRender();
+  }, 45000);
   return {
     addPost({ text = '', files = [] } = {}) {
       if (feedServer.publish) {
