@@ -7206,7 +7206,7 @@ function feedSideRedraw() {
   document.querySelectorAll('.pv-posts .ppCard').forEach((el) => {
     const p = feedSide.get(el.dataset.pid);
     if (!p || el.contains(document.activeElement)) return;
-    el.replaceWith(feedPostEl(p));
+    el.replaceWith(feedSideCard(p));
   });
 }
 
@@ -7271,7 +7271,22 @@ function feedCardFor(r, myUid) {
     };
     feedSide.set(r.id, p);
   }
-  return feedPostEl(p);
+  return feedSideCard(p);
+}
+
+// بطاقة الصفحة الشخصية: زرّا الإعجاب والتعليق مربوطان مباشرة بالبطاقة نفسها
+function feedSideCard(p) {
+  const card = feedPostEl(p);
+  card.querySelectorAll('button[data-act="like"], button[data-act="cm"]').forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (b.dataset.act === 'like') { feedLike(p); return; }
+      feedToggle(feedOpenPosts, p.id);
+      if (feedOpenPosts.has(p.id)) feedEnsureComments(p.id);
+      feedRender();
+    });
+  });
+  return card;
 }
 
 const feedServer = {
