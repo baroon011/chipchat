@@ -9807,7 +9807,8 @@ function initBack() {
 }
 
 // مشغّل وسائط موحّد للتطبيق: فيديو وصوت، بأزرار مرسومة داخل التطبيق (لا تعتمد على مشغّل المتصفح)
-// الاستخدام: const p = mountPlayer(container, url, { kind: 'video' | 'audio', muted, autoplay });
+// الاستخدام: const p = mountPlayer(container, url, { kind: 'video' | 'audio', muted, autoplay, blob });
+// blob: true يحمّل الملف كاملاً أولاً ثم يشغّله من الذاكرة (أضمن على الهواتف من البث المتقطع)
 const PLAYER_CSS = `
 .pl-wrap{display:flex;flex-direction:column;background:#000;color:#fff;border-radius:12px;overflow:hidden;width:100%;max-width:100%;box-sizing:border-box}
 .pl-wrap.pl-audio{background:rgba(255,255,255,.85);color:inherit}
@@ -9819,7 +9820,7 @@ const PLAYER_CSS = `
 .pl-btn{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.14);color:inherit;font-size:15px;cursor:pointer;display:grid;place-items:center;padding:0}
 .pl-seek{flex:1;min-width:0;accent-color:#e040fb}
 .pl-time{flex:none;font-size:12px;font-variant-numeric:tabular-nums;direction:ltr}
-.pl-note{padding:0 10px 6px;font-size:11px;opacity:.7}
+.pl-note{padding:0 10px 6px;font-size:11px;opacity:.8}
 .pl-wrap.pl-audio .pl-media,.pl-wrap.pl-audio .pl-note{display:none}
 `;
 let playerCssDone = false;
@@ -9834,22 +9835,26 @@ function ensurePlayerCss() {
 function mountPlayer(host, src, opts = {}) {
   ensurePlayerCss();
   const isVideo = opts.kind !== 'audio';
+  // أنماط مضمّنة للعناصر الأساسية، حتى لا تؤثر فيها أي قواعد CSS أخرى في التطبيق
   const wrap = document.createElement('div');
   wrap.className = 'pl-wrap' + (isVideo ? '' : ' pl-audio');
+  wrap.style.cssText = 'display:flex;flex-direction:column;width:100%;height:100%;background:#000;color:#fff;box-sizing:border-box;overflow:hidden';
 
   const media = document.createElement(isVideo ? 'video' : 'audio');
   media.className = isVideo ? 'pl-media' : 'pl-el';
-  media.preload = 'metadata';
+  media.preload = 'auto';
   media.playsInline = true;
-  media.src = src;
+  if (isVideo) media.style.cssText = 'display:block;width:100%;flex:1 1 auto;min-height:0;object-fit:contain;background:#000';
   if (opts.muted) media.muted = true;
 
   const bar = document.createElement('div');
   bar.className = 'pl-bar';
+  bar.style.cssText = 'display:flex;flex:none;align-items:center;gap:8px;padding:8px 10px;background:rgba(0,0,0,.75);direction:ltr';
   const mkBtn = (txt, title) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'pl-btn';
+    b.style.cssText = 'flex:none;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.14);color:#fff;font-size:15px;cursor:pointer;padding:0';
     b.textContent = txt;
     if (title) b.title = title;
     return b;
@@ -9861,8 +9866,10 @@ function mountPlayer(host, src, opts = {}) {
   seek.max = '1000';
   seek.value = '0';
   seek.className = 'pl-seek';
+  seek.style.cssText = 'flex:1;min-width:0;accent-color:#e040fb';
   const time = document.createElement('span');
   time.className = 'pl-time';
+  time.style.cssText = 'flex:none;font-size:12px;color:#fff';
   time.textContent = '0:00';
   const muteBtn = mkBtn(media.muted ? '🔇' : '🔊', 'صوت');
   bar.append(playBtn, seek, time, muteBtn);
@@ -9873,6 +9880,7 @@ function mountPlayer(host, src, opts = {}) {
   }
   const note = document.createElement('div');
   note.className = 'pl-note';
+  note.style.cssText = 'padding:0 10px 6px;font-size:11px;color:#fff;opacity:.8;flex:none';
 
   wrap.append(media, bar, note);
   host.replaceChildren(wrap);
@@ -9892,7 +9900,6 @@ function mountPlayer(host, src, opts = {}) {
   };
 
   playBtn.addEventListener('click', togglePlay);
-  if (isVideo) media.addEventListener('click', togglePlay);
   muteBtn.addEventListener('click', () => {
     media.muted = !media.muted;
     muteBtn.textContent = media.muted ? '🔇' : '🔊';
@@ -9915,16 +9922,39 @@ function mountPlayer(host, src, opts = {}) {
     time.textContent = '0:00 / ' + fmt(media.duration);
     if (isVideo) note.textContent = media.videoWidth + 'x' + media.videoHeight;
   });
-  media.addEventListener('play', () => { playBtn.textContent = '❚❚'; playBtn.title = 'إيقاف مؤقت'; });
+  media.addEventListener('play', () => { playBtn.textContent = '❚❚'; playBtn.title = 'إيقاف مؤقت'; note.textContent = ''; });
   media.addEventListener('pause', () => { playBtn.textContent = '▶'; playBtn.title = 'تشغيل'; });
   media.addEventListener('ended', () => { playBtn.textContent = '↻'; playBtn.title = 'إعادة'; });
-  media.addEventListener('error', () => {
-    note.textContent = 'تعذّر تحميل الملف (' + (media.error ? media.error.code : '?') + ')';
-  });
+  const failed = () => {
+    note.textContent = 'تعذّر تحميل الفيديو (' + (media.error ? media.error.code : '?') + ')';
+  };
+  media.addEventListener('error', failed);
 
-  if (opts.autoplay) {
-    const p = media.play();
-    if (p && p.catch) p.catch(() => {});
+  const start = () => {
+    if (opts.autoplay) {
+      const p = media.play();
+      if (p && p.catch) p.catch(() => {});
+    }
+  };
+
+  if (opts.blob && isVideo) {
+    // تحميل كامل ثم تشغيل من الذاكرة
+    note.textContent = 'جاري التحميل…';
+    fetch(src)
+      .then((res) => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!wrap.isConnected) return;
+        media.src = URL.createObjectURL(new Blob([blob], { type: 'video/mp4' }));
+        media.load();
+        start();
+      })
+      .catch((e) => { note.textContent = 'تعذّر تحميل الفيديو: ' + ((e && e.message) || e); });
+  } else {
+    media.src = src;
+    start();
   }
   return { wrap, media, stop: () => media.pause() };
 }
@@ -10207,7 +10237,7 @@ function initStatus(deps) {
         return;
       }
       // الفيديو: مشغّل التطبيق الموحّد، يبدأ مكتوماً تلقائياً
-      mountPlayer(media, u, { kind: 'video', muted: true, autoplay: true });
+      mountPlayer(media, u, { kind: 'video', muted: true, autoplay: true, blob: true });
     } catch (e) {
       media.replaceChildren(stBox('st-wait', stTr('status.mediaErr') + ': ' + ((e && e.message) || e)));
     }
