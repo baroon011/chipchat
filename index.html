@@ -10361,7 +10361,8 @@ function initStatus(deps) {
     media.querySelectorAll('.st-content').forEach((n) => n.remove());
     const box = document.createElement('div');
     box.className = 'st-content';
-    box.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;pointer-events:none';
+    // z-index أعلى من أزرار التنقل (3) حتى يستقبل المشغّل اللمسات، والطبقة نفسها لا تحجب شيئاً (pointer-events:none)
+    box.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:4;pointer-events:none';
     box.dataset.kind = r.kind;
     media.prepend(box);
     if (r.kind === 'text') {
