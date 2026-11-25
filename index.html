@@ -13300,8 +13300,8 @@ function startGuestTour() {
     const st = document.createElement('style');
     st.id = 'guestTourStyle';
     st.textContent = `
-      #guestTour{position:fixed;inset:0;z-index:9000;pointer-events:none}
-      #guestTour .gt-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,6,20,.62);outline:3px solid #ffd166;outline-offset:2px;transition:all .25s ease;pointer-events:none}
+      #guestTour{position:fixed;inset:0;z-index:99999;pointer-events:none}
+      #guestTour .gt-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,6,20,.62);outline:3px solid #ffd166;outline-offset:2px;pointer-events:none}
       #guestTour .gt-bubble{position:fixed;left:16px;right:16px;max-width:360px;margin:0 auto;padding:16px;border-radius:16px;background:#fffdf8;color:#1d0f33;box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:auto;font-size:15px;line-height:1.6}
       #guestTour .gt-text{margin:0 0 12px}
       #guestTour .gt-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -13317,14 +13317,12 @@ function startGuestTour() {
   }
   const root = document.createElement('div');
   root.id = 'guestTour';
-  root.innerHTML = '<div class="gt-hole" id="gtHole"></div><div class="gt-bubble" id="gtBubble"><p class="gt-text" id="gtText"></p><div class="gt-row"><span class="gt-count" id="gtCount"></span><div class="gt-btns"><button type="button" class="gt-skip" id="gtSkip"></button><button type="button" class="gt-next" id="gtNext"></button><button type="button" class="gt-reg" id="gtReg" hidden></button><button type="button" class="gt-done" id="gtDone" hidden></button></div></div></div>';
+  root.innerHTML = '<div class="gt-hole" id="gtHole"></div><div class="gt-bubble" id="gtBubble"><p class="gt-text" id="gtText"></p><div class="gt-row"><span class="gt-count" id="gtCount"></span><div class="gt-btns"><button type="button" class="gt-next" id="gtNext"></button><button type="button" class="gt-reg" id="gtReg" hidden></button><button type="button" class="gt-done" id="gtDone" hidden></button></div></div></div>';
   document.body.append(root);
   gtRoot = root;
-  document.getElementById('gtSkip').textContent = t('gt.skip');
   document.getElementById('gtNext').textContent = t('gt.next');
   document.getElementById('gtReg').textContent = t('gt.reg');
   document.getElementById('gtDone').textContent = t('gt.done');
-  document.getElementById('gtSkip').addEventListener('click', gtEnd);
   document.getElementById('gtDone').addEventListener('click', gtEnd);
   document.getElementById('gtNext').addEventListener('click', () => {
     const cur = GUEST_TOUR_STEPS[gtIdx];
@@ -13333,21 +13331,40 @@ function startGuestTour() {
   });
   document.getElementById('gtReg').addEventListener('click', () => { gtEnd(); profile.open(); });
   window.addEventListener('resize', gtPlace);
+  gtTimer = setInterval(gtTick, 400);
   gtGo(0);
 }
 function gtEnd() {
   try { localStorage.setItem(GUEST_TOUR_KEY, '1'); } catch (e) {}
   if (gtClick) { document.removeEventListener('click', gtClick, true); gtClick = null; }
+  if (gtTimer) { clearInterval(gtTimer); gtTimer = null; }
   window.removeEventListener('resize', gtPlace);
   if (gtRoot) gtRoot.remove();
   gtRoot = null;
   gtIdx = -1;
 }
+let gtTimer = null;
+let gtMissing = 0;
+// يعيد حساب موضع الإطار والشرح بشكل دوري، لأن الصفحة قد تتحرك أثناء التنقل
+function gtTick() {
+  if (!gtRoot) return;
+  const st = GUEST_TOUR_STEPS[gtIdx];
+  if (!st) return;
+  const el = st.sel ? document.querySelector(st.sel) : null;
+  if (st.sel && (!el || !el.getClientRects().length)) {
+    gtMissing++;
+    // خطوة الشرح فقط تنتقل تلقائياً إن لم يظهر هدفها بعد ثوانٍ
+    if (st.mode === 'next' && gtMissing > 8) return gtGo(gtIdx + 1);
+  } else {
+    gtMissing = 0;
+  }
+  gtPlace();
+}
 function gtPlace() {
   const st = GUEST_TOUR_STEPS[gtIdx];
   const hole = document.getElementById('gtHole');
   const bubble = document.getElementById('gtBubble');
-  if (!st || !hole || !bubble) return;
+  if (!st || !hole || !bubble || !gtRoot) return;
   const el = st.sel ? document.querySelector(st.sel) : null;
   if (!el || !el.getClientRects().length) {
     hole.style.cssText = 'top:0;left:0;width:100%;height:100%;border-radius:0;box-shadow:none;outline:none;background:rgba(10,6,20,.62)';
@@ -13355,8 +13372,12 @@ function gtPlace() {
     return;
   }
   const r = el.getBoundingClientRect();
+  // إزاحة الجذر نفسه، لأن الحاوية قد لا تبدأ من أعلى الشاشة بالضبط
+  const root = gtRoot.getBoundingClientRect();
   const pad = 6;
-  hole.style.cssText = `top:${r.top - pad}px;left:${r.left - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
+  const top = r.top - pad - root.top;
+  const left = r.left - pad - root.left;
+  hole.style.cssText = `top:${top}px;left:${left}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
   // الشرح يظهر في النصف المقابل للهدف، حتى لا يغطي الزر أبداً
   const centerY = r.top + r.height / 2;
   if (centerY < window.innerHeight / 2) {
@@ -13370,35 +13391,25 @@ function gtGo(i) {
   if (gtClick) { document.removeEventListener('click', gtClick, true); gtClick = null; }
   if (i >= GUEST_TOUR_STEPS.length) return gtEnd();
   gtIdx = i;
+  gtMissing = 0;
   const st = GUEST_TOUR_STEPS[i];
   document.getElementById('gtText').textContent = t(st.text);
   document.getElementById('gtCount').textContent = `${i + 1} / ${GUEST_TOUR_STEPS.length}`;
   const isFinal = st.mode === 'final';
   document.getElementById('gtNext').hidden = st.mode !== 'next';
-  document.getElementById('gtSkip').hidden = isFinal;
   document.getElementById('gtReg').hidden = !isFinal;
   document.getElementById('gtDone').hidden = !isFinal;
   if (st.mode === 'click' && st.sel) {
     gtClick = (e) => {
       if (!e.target.closest || !e.target.closest(st.sel)) return;
-      setTimeout(() => gtGo(i + 1), 350);
       document.removeEventListener('click', gtClick, true);
       gtClick = null;
+      setTimeout(() => gtGo(i + 1), 350);
     };
     document.addEventListener('click', gtClick, true);
   }
   const el = st.sel ? document.querySelector(st.sel) : null;
   if (el && el.getClientRects().length) el.scrollIntoView({ block: 'nearest' });
-  setTimeout(() => {
-    if (gtRoot && gtIdx === i) {
-      // لو الهدف مش ظاهر (مثلاً مغطّى)، تخطى الخطوة بدل ما نعلّق
-      const target = st.sel ? document.querySelector(st.sel) : null;
-      if (st.sel && (!target || !target.getClientRects().length)) {
-        if (st.mode === 'next') return gtGo(i + 1);
-      }
-      gtPlace();
-    }
-  }, 250);
   gtPlace();
 }
 document.getElementById('guestSaveBtn')?.addEventListener('click', async () => {
