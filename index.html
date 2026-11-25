@@ -11580,6 +11580,9 @@ authFormEl.addEventListener('submit', async (e) => {
     if (nErr) { authMsgEl.textContent = nErr.message.includes('taken') ? t('auth.nickErr') : nErr.message; return; }
     showHome(nick);
     loadAppConfig();
+    // الزائر يدخل الدردشة العامة مباشرة، ومعه إرشادات البداية
+    goPublic(PUBLIC_ROOM);
+    showGuestChatTips();
     return;
   }
   if (authKind === 'signup') {
@@ -13275,6 +13278,36 @@ document.getElementById('guestTipsOk')?.addEventListener('click', () => {
   try { localStorage.setItem(GUEST_TIPS_KEY, '1'); } catch (e) {}
   document.getElementById('guestTips').hidden = true;
 });
+// إرشادات الزائر داخل الدردشة العامة، تختفي بعد الضغط على الزر مرة واحدة في هذا المتصفح
+const GUEST_CHAT_TIPS_KEY = 'cc_guest_chat_tips_done';
+function showGuestChatTips() {
+  try { if (localStorage.getItem(GUEST_CHAT_TIPS_KEY) === '1') return; } catch (e) {}
+  if (document.getElementById('guestChatTips')) return;
+  const box = document.createElement('div');
+  box.id = 'guestChatTips';
+  box.className = 'st-card';
+  box.style.margin = '8px';
+  const h = document.createElement('h3');
+  h.className = 'st-title';
+  h.textContent = t('guest.tipsTitle');
+  const ol = document.createElement('ol');
+  ol.className = 'app-note';
+  ['guest.tip1', 'guest.tip2', 'guest.tip3'].forEach((k) => {
+    const li = document.createElement('li');
+    li.textContent = t(k);
+    ol.append(li);
+  });
+  const ok = document.createElement('button');
+  ok.className = 'st-btn';
+  ok.type = 'button';
+  ok.textContent = t('guest.tipsOk');
+  ok.addEventListener('click', () => {
+    try { localStorage.setItem(GUEST_CHAT_TIPS_KEY, '1'); } catch (e) {}
+    box.remove();
+  });
+  box.append(h, ol, ok);
+  chatView.prepend(box);
+}
 document.getElementById('guestSaveBtn')?.addEventListener('click', async () => {
   const email = (document.getElementById('guestEmail').value || '').trim();
   const pw = document.getElementById('guestPw').value;
