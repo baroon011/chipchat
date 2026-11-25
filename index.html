@@ -13283,8 +13283,8 @@ const GUEST_TOUR_KEY = 'cc_guest_tour_done';
 const GUEST_TOUR_STEPS = [
   { sel: '#topbar [data-action="home"]', text: 'gt.s1', mode: 'click' },
   { sel: '#bar .tab[data-key="post"]', text: 'gt.s2', mode: 'next' },
-  { sel: '#bar .tab[data-key="discover"]', text: 'gt.s3', mode: 'next', after: () => { const b = document.getElementById('dscBack'); if (b && b.getClientRects().length) b.click(); } },
-  { sel: '#pfCoverBtn', text: 'gt.s4', mode: 'next' },
+  { sel: '#bar .tab[data-key="discover"]', text: 'gt.s3', mode: 'click' },
+  { sel: '#dscStar', text: 'gt.s4', mode: 'next', after: () => { const b = document.getElementById('dscBack'); if (b && b.getClientRects().length) b.click(); } },
   { sel: '#bar .tab[data-key="public"]', text: 'gt.s5', mode: 'click' },
   { sel: '#chatText', text: 'gt.s6', mode: 'next' },
   { sel: '#chatGiftBtn', text: 'gt.s7', mode: 'next' },
@@ -13301,7 +13301,7 @@ function startGuestTour() {
     st.id = 'guestTourStyle';
     st.textContent = `
       #guestTour{position:fixed;inset:0;z-index:9000;pointer-events:none}
-      #guestTour .gt-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,6,20,.62);transition:all .25s ease;pointer-events:none}
+      #guestTour .gt-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,6,20,.62);outline:3px solid #ffd166;outline-offset:2px;transition:all .25s ease;pointer-events:none}
       #guestTour .gt-bubble{position:fixed;left:16px;right:16px;max-width:360px;margin:0 auto;padding:16px;border-radius:16px;background:#fffdf8;color:#1d0f33;box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:auto;font-size:15px;line-height:1.6}
       #guestTour .gt-text{margin:0 0 12px}
       #guestTour .gt-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -13326,7 +13326,11 @@ function startGuestTour() {
   document.getElementById('gtDone').textContent = t('gt.done');
   document.getElementById('gtSkip').addEventListener('click', gtEnd);
   document.getElementById('gtDone').addEventListener('click', gtEnd);
-  document.getElementById('gtNext').addEventListener('click', () => gtGo(gtIdx + 1));
+  document.getElementById('gtNext').addEventListener('click', () => {
+    const cur = GUEST_TOUR_STEPS[gtIdx];
+    if (cur && cur.after) cur.after();
+    gtGo(gtIdx + 1);
+  });
   document.getElementById('gtReg').addEventListener('click', () => { gtEnd(); profile.open(); });
   window.addEventListener('resize', gtPlace);
   gtGo(0);
@@ -13346,18 +13350,19 @@ function gtPlace() {
   if (!st || !hole || !bubble) return;
   const el = st.sel ? document.querySelector(st.sel) : null;
   if (!el || !el.getClientRects().length) {
-    hole.style.cssText = 'top:0;left:0;width:100%;height:100%;border-radius:0;box-shadow:none;background:rgba(10,6,20,.62)';
+    hole.style.cssText = 'top:0;left:0;width:100%;height:100%;border-radius:0;box-shadow:none;outline:none;background:rgba(10,6,20,.62)';
     bubble.style.cssText = 'top:50%;transform:translateY(-50%)';
     return;
   }
   const r = el.getBoundingClientRect();
   const pad = 6;
   hole.style.cssText = `top:${r.top - pad}px;left:${r.left - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
-  bubble.style.transform = '';
-  if (r.top > window.innerHeight / 2) {
-    bubble.style.cssText = `bottom:${window.innerHeight - r.top + 16}px;top:auto`;
+  // الشرح يظهر في النصف المقابل للهدف، حتى لا يغطي الزر أبداً
+  const centerY = r.top + r.height / 2;
+  if (centerY < window.innerHeight / 2) {
+    bubble.style.cssText = 'bottom:calc(24px + env(safe-area-inset-bottom, 0px));top:auto';
   } else {
-    bubble.style.cssText = `top:${r.bottom + 16}px;bottom:auto`;
+    bubble.style.cssText = 'top:calc(24px + env(safe-area-inset-top, 0px));bottom:auto';
   }
 }
 function gtGo(i) {
