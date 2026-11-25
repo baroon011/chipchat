@@ -2765,7 +2765,7 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
 .at-ad-img { width: 48px; height: 48px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); }
 .at-ad-ic { font-size: 28px; width: 48px; text-align: center; }
 .at-row .at-ad + .at-head { margin-top: 0; }
-.at-pos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 220px; }
+.at-pos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 220px; direction: ltr; }
 .at-cell {
   height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; padding: 0;
   position: relative;
@@ -2791,8 +2791,8 @@ html[dir="ltr"] .chat-list { border-left: 1px solid var(--line); }
   opacity: 0; transform: scale(.96); transition: opacity .35s ease, transform .35s ease;
 }
 .bb-ad.on { opacity: var(--op, .85); transform: none; }
-.bb-h { flex-direction: row; }
-.bb-v { flex-direction: column; align-items: stretch; }
+.bb-h { flex-direction: row; flex-wrap: nowrap; }
+.bb-v { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
 
 /* المكان: عمودي (أعلى/منتصف/أسفل) وأفقي (يسار/وسط/يمين) */
 .bb-top { top: 96px; }
