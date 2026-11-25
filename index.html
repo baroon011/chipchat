@@ -11311,6 +11311,8 @@ authFormEl.addEventListener('submit', async (e) => {
     const nick = authFormEl.elements.nick.value.trim();
     if (nick.length < 2) { authMsgEl.textContent = t('auth.nickErr'); return; }
     showHome(nick);
+    // الزائر يقرأ الإعدادات العامة (إعلانات، أسعار هدايا، أفاتار) بدون حساب
+    loadAppConfig();
     return;
   }
   if (authKind === 'signup') {
