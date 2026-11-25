@@ -7849,7 +7849,6 @@ const RS_RINGS = [
   { n: 5, rf: 0.3, off: 0.2, base: 0.3 },
 ];
 const RS_BANDS = 16;
-const RS_SENS = 3.2; // حساسية الوردة للصوت (أعلى = تتفاعل مع أخفت الأصوات)
 
 function rsPetal(ctx, cx, cy, ang, L, hw, r0, fill, stroke) {
   const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx;
@@ -7878,7 +7877,7 @@ function mountRose({ anchor, parent, page, ringR = 0.34 }) {
   let t = 0;
   let kick = 0;
   let level = 0;
-  let lvAvg = 0.05;
+  let peak = 0.2; // أعلى قيمة حديثة للنطاقات، تتكيف مع مستوى الصوت
   let prevSum = 0;
   const band = new Array(RS_BANDS).fill(0);
   const ST = [];
@@ -7897,21 +7896,27 @@ function mountRose({ anchor, parent, page, ringR = 0.34 }) {
     }
     musicAnalyser.getByteFrequencyData(musicData);
     const n = musicData.length;
-    let sum = 0;
+    const raw = new Array(RS_BANDS);
+    let top = 0;
     for (let b = 0; b < RS_BANDS; b++) {
       const a = Math.floor(Math.pow(b / RS_BANDS, 2) * n * 0.5) + 1;
       const c = Math.max(a + 1, Math.floor(Math.pow((b + 1) / RS_BANDS, 2) * n * 0.5) + 1);
       let v = 0;
       for (let j = a; j < c && j < n; j++) v += musicData[j];
-      v = Math.min(1, (v / (c - a) / 255) * RS_SENS);
-      band[b] = v;
-      sum += v;
+      raw[b] = v / (c - a) / 255;
+      if (raw[b] > top) top = raw[b];
+    }
+    // كل نطاق يُقاس بالنسبة لأعلى قيمة حديثة، فتتحرك الوردة بقوة في الأغاني الهادئة والصاخبة معاً
+    peak = Math.max(top, peak * 0.992, 0.05);
+    let sum = 0;
+    for (let b = 0; b < RS_BANDS; b++) {
+      band[b] = Math.min(1, raw[b] / peak);
+      sum += band[b];
     }
     const flux = Math.max(0, sum - prevSum) / RS_BANDS;
     prevSum = sum;
-    kick = Math.max(kick * 0.82, Math.min(1, flux * 22));
-    lvAvg = lvAvg * 0.995 + (sum / RS_BANDS) * 0.005;
-    level = Math.min(1, (sum / RS_BANDS) / (lvAvg + 0.03));
+    kick = Math.max(kick * 0.8, Math.min(1, flux * 5));
+    level = Math.min(1, sum / RS_BANDS);
   }
 
   function frame() {
@@ -7960,7 +7965,7 @@ function mountRose({ anchor, parent, page, ringR = 0.34 }) {
     }
     for (let p = 0; p < PET.length; p++) {
       const P = PET[p];
-      const bv = playing ? Math.min(1, (band[(Math.floor((P.idx * RS_BANDS) / RS_RINGS[P.ring].n) + P.ring * 3) % RS_BANDS] || 0) * 2.2) : 0;
+      const bv = playing ? (band[(Math.floor((P.idx * RS_BANDS) / RS_RINGS[P.ring].n) + P.ring * 3) % RS_BANDS] || 0) : 0;
       P.v = Math.max(P.v * 0.8, bv);
       const ang = P.ang + sway * (1 - P.ring * 0.25);
       const L = R * P.rf * (0.92 + 0.28 * beat + 0.3 * P.v);
