@@ -5686,6 +5686,10 @@ function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () 
         list.lastElementChild.append(img);
       }
     },
+    // ينزل لآخر رسالة (أحدث الرسائل)
+    scrollEnd() {
+      list.scrollTop = list.scrollHeight;
+    },
     // رسالة من النظام في الدردشة (طرد، حظر، نقل...)
     addSystem(text) {
       addMessage(text, 'chat-msg-sys');
@@ -8194,23 +8198,22 @@ function atAnnounce() {
     boxes.append(l);
   }
   const list = atEl('div');
-  const draw = () => {
-    const items = atGet('announce', []).slice().reverse().slice(0, 10);
+  const draw = async () => {
+    const { data, error } = await sbClient.from('announcements').select('text,places,created_at').order('created_at', { ascending: false }).limit(10);
+    if (error) return atNoteErr(list, error);
     list.replaceChildren(
-      ...(items.length
-        ? items.map((a) => atRow(a.text, atStamp(a.at) + ' · ' + a.where.map((w) => t('at.announce.' + w)).join(', ')))
+      ...((data || []).length
+        ? data.map((a) => atRow(a.text, atStamp(a.created_at) + ' · ' + (a.places || []).map((w) => t('at.announce.' + w)).join(', ')))
         : [atEmpty()])
     );
   };
-  const send = atBtn(t('at.announce.send'), 'st-btn', () => {
+  const send = atBtn(t('at.announce.send'), 'st-btn', async () => {
     const msg = text.value.trim();
     if (!msg) return;
     const sel = Object.keys(where).filter((k) => where[k].checked);
     if (!sel.length) return;
-    const all = atGet('announce', []);
-    all.push({ at: Date.now(), text: msg, where: sel });
-    atSet('announce', all.slice(-100));
-    atLog('announce');
+    const { error } = await sbClient.rpc('admin_announce', { p_text: msg, p_places: sel });
+    if (error) return atNoteErr(list, error);
     text.value = '';
     draw();
   });
@@ -8225,11 +8228,10 @@ function atClearRoom() {
   for (const r of ROOMS) {
     box.append(
       atRow(r.icon + ' ' + t(r.labelKey), '', [
-        atBtn(t('at.clear.btn'), 'chip at-danger', () => {
+        atBtn(t('at.clear.btn'), 'chip at-danger', async () => {
           if (!confirm(t('at.clear.confirm'))) return;
-          atSet('cleared.' + r.id, Date.now());
-          atLog('clear ' + r.id);
-          box.querySelector('.at-note').textContent = t('at.clear.done');
+          const { data, error } = await sbClient.rpc('admin_clear_room', { p_room: r.id });
+          box.querySelector('.at-note').textContent = error ? t('at.common.failed') + ' · ' + error.message : t('at.clear.done') + ' (' + (data || 0) + ')';
         }),
       ])
     );
@@ -11168,6 +11170,7 @@ function goPublic(roomId) {
   feedView.hidden = true;
   pfPage.hidden = true;
   chatView.hidden = false;
+  requestAnimationFrame(() => chat.scrollEnd());
   barEl.hidden = true;
   sidebar.setEnabled(true);
   bar.setActive('public');
@@ -12998,6 +13001,10 @@ async function publicStart() {
     dmStart();
     const { data } = await sbClient.from('messages').select('*').eq('room', PUBLIC_ROOM).order('created_at', { ascending: false }).limit(50);
     for (const r of (data || []).reverse()) await publicShow(r, !!pubMyId && r.user_id === pubMyId);
+    // أحدث الرسائل تظهر أولاً عند الدخول: ننزل لآخر رسالة بعد التحميل وبعد تحميل الصور
+    chat.scrollEnd();
+    setTimeout(() => chat.scrollEnd(), 400);
+    setTimeout(() => chat.scrollEnd(), 1200);
   } catch (e) {}
   sbClient.channel('pub-' + PUBLIC_ROOM)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'room=eq.' + PUBLIC_ROOM }, (p) => {
@@ -13005,6 +13012,13 @@ async function publicStart() {
       if (!r || (pubMyId && r.user_id === pubMyId)) return;
       publicShow(r, false);
       if (notifSoundOn()) playSound('message');
+    })
+    .subscribe();
+  // الإعلانات الإدارية: تظهر في الدردشة العامة لحظة نشرها إن كانت تشمل الدردشة العامة
+  sbClient.channel('announce-live')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, (p) => {
+      const a = p.new;
+      if (a && Array.isArray(a.places) && a.places.includes('pub')) chat.addSystem(a.text);
     })
     .subscribe();
 }
