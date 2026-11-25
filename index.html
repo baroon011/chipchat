@@ -4631,16 +4631,20 @@ function initSettings(handlers = {}) {
   });
 
   // ----- الاختيارات (زي: مخفي / ظاهر) -----
-  view.addEventListener('click', (e) => {
+  // الاختيارات والحفظ تعمل في الملف الشخصي وفي شاشة الإدارة (قسم المشرف)
+  const adminSheetEl = document.getElementById('appAdminSheet');
+  const segClick = (e) => {
     const b = e.target.closest('.st-seg button');
     if (!b) return;
     const seg = b.parentElement;
     seg.dataset.value = b.dataset.value;
     seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  });
+  };
+  view.addEventListener('click', segClick);
+  if (adminSheetEl) adminSheetEl.addEventListener('click', segClick);
 
   // ----- الحفظ -----
-  view.addEventListener('click', (e) => {
+  const saveClick = (e) => {
     const btn = e.target.closest('[data-save]');
     if (!btn) return;
     const key = btn.dataset.save;
@@ -4660,7 +4664,9 @@ function initSettings(handlers = {}) {
 
     h.onSave(key, collect(card));
     showToast(t('settings.saved'));
-  });
+  };
+  view.addEventListener('click', saveClick);
+  if (adminSheetEl) adminSheetEl.addEventListener('click', saveClick);
 
   // ----- الأصوات: بتتحفظ مع كل اختيار -----
   document.querySelectorAll('[data-sound]').forEach((sel) => {
@@ -5372,7 +5378,7 @@ const PACKS = [
   { coins: 3000, price: 25 },
 ];
 
-function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () => {}, onAuthor = () => {}, selfName = () => '' } = {}) {
+function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () => {}, onAuthor = () => {}, selfName = () => '', selfStyle = () => null } = {}) {
   const $ = (id) => document.getElementById(id);
   const list = $('chatList');
   const form = $('chatForm');
@@ -5500,7 +5506,7 @@ function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () 
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    addMessage(text, '', { id: 'me', name: selfName() || t('topbar.userName'), self: true });
+    addMessage(text, '', { id: 'me', name: selfName() || t('topbar.userName'), self: true, style: selfStyle() });
     onSend(text);
     input.value = '';
   });
@@ -10970,7 +10976,7 @@ function openRoom(id) {
 }
 
 // الدردشة العامة: الإرسال الحقيقي هيتربط بالـ Supabase
-const chat = initChat({ selfName: () => myNickVal, onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
+const chat = initChat({ selfName: () => myNickVal, selfStyle: () => (pubMyId ? pubStyleCache.get(pubMyId) || null : null), onSend: (text) => publicSend(text), onSendMedia: (f) => publicSendMedia(f), onAuthor: (person) => dm.openPersonMenu(person, { canModerate: isAdmin }) });
 
 // الإدارة تُحدَّد من السيرفر عبر is_staff() (نفس الدالة التي تحمي سياسات الموسيقى).
 // وضع المطوّر (DEV_FORCE_ADMIN) يُضبط من البناء فقط، ويكون false في النسخة المنشورة.
@@ -13004,7 +13010,7 @@ async function saveAdminStyle(d) {
   const style = { nameColor: d.nameColor, textColor: d.color, bold: !!d.bold, badge: d.badge || 'none', hideBadge: !!d.hideBadge };
   const { error } = await sbClient.rpc('staff_style_set', { p_style: style });
   if (error) return chat.addSystem(t('at.common.failed') + ' · ' + error.message);
-  if (pubMyId) pubStyleCache.delete(pubMyId);
+  if (pubMyId) pubStyleCache.set(pubMyId, style);
 }
 // الإعلان الحالي في الشريط المتحرك: يتجه من اليمين لليسار في العربية، ومن اليسار لليمين في الإنجليزية
 function showAnnouncement(a) {
