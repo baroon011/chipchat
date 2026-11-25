@@ -7993,6 +7993,11 @@ function adsCfgNormal(c) {
 let remoteCfg = null;
 let remoteItems = [];
 let adsSaver = () => {};
+// أصحاب القنوات المدفوعة (اشتراك فعّال) لا تظهر لهم الإعلانات
+let adFree = false;
+function setAdFree(v) {
+  adFree = !!v;
+}
 function setAdsRemote(v) {
   remoteCfg = v && v.cfg && typeof v.cfg === 'object' ? v.cfg : null;
   remoteItems = v && Array.isArray(v.items) ? v.items : [];
@@ -8051,7 +8056,7 @@ function bbSchedule(sec) {
 
 function bbTick() {
   const c = adsCfg();
-  if (!c.on) return bbSchedule(60);
+  if (!c.on || adFree) return bbSchedule(60);
   // قنوات المؤسسات والروضة بلا إعلانات
   if (getZone() === 'admin') return bbSchedule(5);
   const where = bbWhere();
@@ -13180,6 +13185,7 @@ async function publicStart() {
     for (const r of (data || []).reverse()) await publicShow(r, !!pubMyId && r.user_id === pubMyId);
     // الإعدادات المشتركة من الخادم ثم آخر إعلان للدردشة العامة (غير المنتهي)
     await loadAppConfig();
+    try { const { data: adf } = await sbClient.rpc('ad_free'); setAdFree(adf === true); } catch (e) {}
     await loadTicker();
     // أحدث الرسائل تظهر أولاً عند الدخول: ننزل لآخر رسالة بعد التحميل وبعد تحميل الصور
     chat.scrollEnd();
