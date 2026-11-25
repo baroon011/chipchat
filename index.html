@@ -4522,6 +4522,7 @@ function initSettings(handlers = {}) {
   const avatarRow = document.getElementById('stAvatarRow');
   const avatarFile = document.getElementById('stAvatarFile');
   let gender = 'girls';
+  let poolList = [];
   let toastTimer = null;
 
   function showToast(text) {
@@ -4542,6 +4543,18 @@ function initSettings(handlers = {}) {
       b.dataset.index = String(i);
       const img = document.createElement('img');
       img.src = avatarSrc(p);
+      img.alt = '';
+      b.append(img);
+      avatarRow.append(b);
+    });
+    // الأفاتار الجاهزة من الإدارة تظهر بعد الأفاتار الأساسية
+    poolList.forEach((src, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'st-avatar-opt';
+      b.dataset.pool = String(i);
+      const img = document.createElement('img');
+      img.src = src;
       img.alt = '';
       b.append(img);
       avatarRow.append(b);
@@ -4572,6 +4585,12 @@ function initSettings(handlers = {}) {
   avatarRow.addEventListener('click', (e) => {
     const b = e.target.closest('.st-avatar-opt');
     if (!b) return;
+    if (b.dataset.pool !== undefined) {
+      const pi = Number(b.dataset.pool);
+      avatarImg.src = poolList[pi];
+      h.onAvatarPick({ pool: pi, src: poolList[pi] });
+      return;
+    }
     const index = Number(b.dataset.index);
     avatarImg.src = avatarSrc((gender === 'girls' ? GIRLS : BOYS)[index]);
     h.onAvatarPick({ gender, index });
@@ -4696,6 +4715,11 @@ function initSettings(handlers = {}) {
     // قسم المشرفين بيظهر للإدارة بس
     setAdmin(on) {
       adminCard.hidden = !on;
+    },
+    // الأفاتار الجاهزة من الإدارة
+    setAvatarPool(list) {
+      poolList = Array.isArray(list) ? list : [];
+      renderAvatars();
     },
   };
 }
@@ -5587,6 +5611,7 @@ function initChat({ onSend = () => {}, onSendMedia = () => {}, onAudioGift = () 
     tier.textContent = t(TIER_KEYS[g.t]);
     const price = document.createElement('span');
     price.className = 'gift-price';
+    price.dataset.gp = g.id;
     if (g.p === 0) {
       price.dataset.i18n = 'gift.free';
       price.textContent = t('gift.free');
@@ -6165,6 +6190,7 @@ function initDm({ onCall = () => {}, onMod = () => {}, onBlock = () => {}, onRep
       tier.textContent = t(TIER_KEYS[g.t]);
       const price = document.createElement('span');
       price.className = 'gift-price';
+      price.dataset.gp = g.id;
       if (g.p === 0) {
         price.dataset.i18n = 'gift.free';
         price.textContent = t('gift.free');
@@ -7963,24 +7989,38 @@ function adsCfgNormal(c) {
   };
 }
 
+// الإعدادات والإعلانات تأتي من الخادم (جدول الإعدادات)، والتطبيق يحدّدها عبر setAdsRemote
+let remoteCfg = null;
+let remoteItems = [];
+let adsSaver = () => {};
+function setAdsRemote(v) {
+  remoteCfg = v && v.cfg && typeof v.cfg === 'object' ? v.cfg : null;
+  remoteItems = v && Array.isArray(v.items) ? v.items : [];
+}
+function setAdsSaver(fn) {
+  adsSaver = fn;
+}
+function adsItems() {
+  return remoteItems;
+}
+function adsItemsSave(list) {
+  remoteItems = Array.isArray(list) ? list : [];
+  adsSaver({ cfg: adsCfgNormal(remoteCfg || ADS_DEF), items: remoteItems });
+}
+
 function adsCfg() {
-  try {
-    return adsCfgNormal({ ...ADS_DEF, ...(JSON.parse(localStorage.getItem('adm.adsCfg')) || {}) });
-  } catch (e) {
-    return adsCfgNormal({ ...ADS_DEF });
-  }
+  return adsCfgNormal({ ...ADS_DEF, ...(remoteCfg || {}) });
 }
 
 function adsCfgSave(c) {
-  try {
-    localStorage.setItem('adm.adsCfg', JSON.stringify(adsCfgNormal(c)));
-  } catch (e) {}
+  remoteCfg = adsCfgNormal(c);
+  adsSaver({ cfg: remoteCfg, items: remoteItems });
 }
 
 // الإعلانات المفعّلة التي يسمح نوعها بالظهور في هذا المكان
 function bbAds(where, c) {
   try {
-    const list = JSON.parse(localStorage.getItem('adm.ads')) || [];
+    const list = remoteItems || [];
     return list.filter((a) => {
       const ty = ADS_TYPES.includes(a.type) ? a.type : 'image';
       return a.on && c.matrix[ty][where];
@@ -8290,99 +8330,6 @@ function atClearRoom() {
   return box;
 }
 
-function atGifts() {
-  const prices = atGet('giftPrices', {});
-  const box = atEl('div', 'at-box');
-  for (const g of GIFTS) {
-    const input = atInput(prices[g.id] ?? g.p, 'number');
-    input.min = '0';
-    input.className = 'at-input at-num';
-    box.append(
-      atRow(g.e + ' ' + t(g.labelKey), '', [
-        atField(t('at.common.price'), input),
-        atBtn(t('at.common.save'), 'chip', () => {
-          const all = atGet('giftPrices', {});
-          all[g.id] = Math.max(0, Math.round(+input.value || 0));
-          atSet('giftPrices', all);
-          atLog('gift price ' + g.id);
-          input.closest('.at-row').querySelector('.at-small')?.remove();
-          input.closest('.at-row').querySelector('.at-head').append(atEl('small', 'at-small', t('at.common.saved')));
-        }),
-      ])
-    );
-  }
-  return box;
-}
-
-function atAvatars() {
-  const box = atEl('div', 'at-box');
-  box.append(atEl('p', 'app-note', t('at.avatars.desc')));
-  const grid = atEl('div', 'at-grid');
-  const draw = () => {
-    const list = atGet('avatars', []);
-    grid.replaceChildren(
-      ...list.map((src, i) => {
-        const cell = atEl('div', 'at-thumb');
-        const img = atEl('img');
-        img.src = src;
-        img.alt = '';
-        cell.append(img, atBtn('✕', 'at-x', () => {
-          const all = atGet('avatars', []);
-          all.splice(i, 1);
-          atSet('avatars', all);
-          atLog('avatar removed');
-          draw();
-        }));
-        return cell;
-      })
-    );
-    if (!list.length) grid.append(atEmpty());
-  };
-  const file = atEl('input', 'at-input');
-  file.type = 'file';
-  file.accept = 'image/*';
-  file.multiple = true;
-  file.addEventListener('change', () => {
-    const files = [...file.files];
-    file.value = '';
-    if (!files.length) return;
-    const have = atGet('avatars', []);
-    let left = files.length;
-    const got = [];
-    const finish = () => {
-      if (--left > 0) return;
-      const ok = got.filter(Boolean).slice(0, Math.max(0, 80 - have.length));
-      if (!ok.length) return alert(t('at.avatars.bad'));
-      atSet('avatars', have.concat(ok));
-      atLog('avatars added ' + ok.length);
-      draw();
-    };
-    files.forEach((f, i) => {
-      const r = new FileReader();
-      r.onload = () => {
-        const im = new Image();
-        im.onload = () => {
-          const cv = document.createElement('canvas');
-          cv.width = cv.height = 128;
-          const m = Math.min(im.width, im.height);
-          cv.getContext('2d').drawImage(im, (im.width - m) / 2, (im.height - m) / 2, m, m, 0, 0, 128, 128);
-          got[i] = cv.toDataURL('image/webp', 0.82);
-          finish();
-        };
-        im.onerror = () => { got[i] = null; finish(); };
-        im.src = r.result;
-      };
-      r.onerror = () => { got[i] = null; finish(); };
-      r.readAsDataURL(f);
-    });
-  });
-  box.append(grid, atSec(t('at.avatars.add')), file, atEl('p', 'app-note', t('at.avatars.max')));
-  draw();
-  return box;
-}
-
-// ---------- الإشراف ----------
-
 function atChReports() {
   const box = atEl('div', 'at-box');
   const draw = () => {
@@ -8411,6 +8358,110 @@ function atChReports() {
     );
   };
   draw();
+  return box;
+}
+
+// يحفظ إعداداً مشتركاً في الخادم (للموظفين فقط)
+async function atSaveConfig(key, value) {
+  const { error } = await sbClient.rpc('admin_config_set', { p_key: key, p_value: value });
+  return error;
+}
+// يجلب قيمة إعداد مشترك من الخادم
+async function atLoadConfig(key, fb) {
+  const { data, error } = await sbClient.from('app_config').select('value').eq('key', key).maybeSingle();
+  if (error) throw error;
+  return data && data.value !== null && data.value !== undefined ? data.value : fb;
+}
+
+function atGifts() {
+  const box = atEl('div', 'at-box');
+  for (const g of GIFTS) {
+    const input = atInput(g.p, 'number');
+    input.min = '0';
+    input.className = 'at-input at-num';
+    box.append(
+      atRow(g.e + ' ' + t(g.labelKey), '', [
+        atField(t('at.common.price'), input),
+        atBtn(t('at.common.save'), 'chip', async () => {
+          const all = {};
+          GIFTS.forEach((x) => { all[x.id] = x.p; });
+          all[g.id] = Math.max(0, Math.round(+input.value || 0));
+          const err = await atSaveConfig('gift_prices', all);
+          const head = input.closest('.at-row').querySelector('.at-head');
+          head.querySelector('.at-small')?.remove();
+          head.append(atEl('small', 'at-small', err ? t('at.common.failed') : t('at.common.saved')));
+        }),
+      ])
+    );
+  }
+  return box;
+}
+
+function atAvatars() {
+  const box = atEl('div', 'at-box');
+  box.append(atEl('p', 'app-note', t('at.avatars.desc')));
+  const grid = atEl('div', 'at-grid');
+  let list = [];
+  const draw = () => {
+    grid.replaceChildren(
+      ...list.map((src, i) => {
+        const cell = atEl('div', 'at-thumb');
+        const img = atEl('img');
+        img.src = src;
+        img.alt = '';
+        cell.append(img, atBtn('✕', 'at-x', async () => {
+          const next = list.filter((_, j) => j !== i);
+          const err = await atSaveConfig('avatar_pool', next);
+          if (err) return atNoteErr(grid, err);
+          list = next;
+          draw();
+        }));
+        return cell;
+      })
+    );
+    if (!list.length) grid.append(atEmpty());
+  };
+  const file = atEl('input', 'at-input');
+  file.type = 'file';
+  file.accept = 'image/*';
+  file.multiple = true;
+  file.addEventListener('change', () => {
+    const files = [...file.files];
+    file.value = '';
+    if (!files.length) return;
+    let left = files.length;
+    const got = [];
+    const finish = async () => {
+      if (--left > 0) return;
+      const ok = got.filter(Boolean).slice(0, Math.max(0, 80 - list.length));
+      if (!ok.length) return alert(t('at.avatars.bad'));
+      const next = list.concat(ok);
+      const err = await atSaveConfig('avatar_pool', next);
+      if (err) return atNoteErr(grid, err);
+      list = next;
+      draw();
+    };
+    files.forEach((f, i) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const im = new Image();
+        im.onload = () => {
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = 128;
+          const m = Math.min(im.width, im.height);
+          cv.getContext('2d').drawImage(im, (im.width - m) / 2, (im.height - m) / 2, m, m, 0, 0, 128, 128);
+          got[i] = cv.toDataURL('image/webp', 0.82);
+          finish();
+        };
+        im.onerror = () => { got[i] = null; finish(); };
+        im.src = r.result;
+      };
+      r.onerror = () => { got[i] = null; finish(); };
+      r.readAsDataURL(f);
+    });
+  });
+  box.append(grid, atSec(t('at.avatars.add')), file, atEl('p', 'app-note', t('at.avatars.max')));
+  atLoadConfig('avatar_pool', []).then((v) => { list = Array.isArray(v) ? v : []; draw(); }).catch((e) => atNoteErr(grid, e));
   return box;
 }
 
@@ -8732,19 +8783,19 @@ function atAds() {
 
   const listEl = atEl('div', 'at-box');
   const draw = () => {
-    const ads = atGet('ads', []);
+    const ads = adsItems();
     listEl.replaceChildren(
       ...(ads.length
         ? ads.map((a, i) => {
             const row = atRow(a.title, (a.on ? t('at.common.on') : t('at.common.off')) + ' · ' + t('at.ads.type' + (a.type === 'text' ? 'Text' : a.type === 'video' ? 'Video' : 'Image')), [
               atBtn(a.on ? t('at.common.off') : t('at.common.on'), 'chip', () => {
-                const all = atGet('ads', []);
+                const all = adsItems();
                 all[i].on = !all[i].on;
-                atSet('ads', all);
+                adsItemsSave(all);
                 draw();
               }),
               atBtn(t('at.common.delete'), 'chip at-danger', () => {
-                atSet('ads', atGet('ads', []).filter((_, j) => j !== i));
+                adsItemsSave(adsItems().filter((_, j) => j !== i));
                 atLog('ad deleted');
                 draw();
               }),
@@ -8782,7 +8833,7 @@ function atAds() {
         note.textContent = t('at.ads.badUrl');
         return;
       }
-      const all = atGet('ads', []);
+      const all = adsItems();
       all.push({
         type,
         ic: icon.value.trim(),
@@ -8794,7 +8845,7 @@ function atAds() {
         on: true,
         at: Date.now(),
       });
-      atSet('ads', all);
+      adsItemsSave(all);
       atLog('ad added ' + type);
       title.value = '';
       text.value = '';
@@ -10556,6 +10607,7 @@ function initStatus(deps) {
 
 
 
+
 const auth = document.getElementById('auth');
 const home = document.getElementById('home');
 const feedView = document.getElementById('feedView');
@@ -10564,6 +10616,9 @@ initWall(document.getElementById('pfWall'));
 initCallLog(document.getElementById('callLogList'));
 initBack();
 initBubbleAd();
+setAdsSaver((v) => {
+  sbClient.rpc('admin_config_set', { p_key: 'ads', p_value: v }).then(({ error }) => { if (error) console.warn('ads save', error.message); });
+});
 mountRose({ anchor: document.getElementById('chatList'), parent: document.getElementById('chatView'), page: document.getElementById('chatView') });
 mountRose({ anchor: document.getElementById('pfCover'), parent: document.getElementById('pfCover'), page: document.getElementById('pfPage'), ringR: 0.46 });
 
@@ -11035,7 +11090,7 @@ const sidebar = initSidebar({
 // الملف الشخصي: الربط بالحفظ الحقيقي يتعمل لاحقاً
 const profile = initSettings({
   onAvatarFile: (file) => { saveMyAvatar(file); },
-  onAvatarPick: (pick) => {},
+  onAvatarPick: (pick) => { if (pick && pick.src) saveAvatarSrc(pick.src); },
   onSave: (key, data) => { if (key === 'admin') saveAdminStyle(data); },
   onPassword: (pwd) => {},
   onSoundChange: (name, value) => setSoundPref(name, value),
@@ -12868,6 +12923,38 @@ function stNotice(text) {
   stNotice._timer = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
+// حفظ الأفاتار الجاهزة التي يختارها المستخدم من الإعدادات
+async function saveAvatarSrc(src) {
+  try {
+    const { error } = await sbClient.rpc('set_avatar', { p_img: src });
+    if (error) throw error;
+    applyMeProfile(null, src);
+    stNotice(t('settings.saved'));
+  } catch (e) {
+    console.error('set_avatar failed', e);
+    stNotice(t('settings.avatarFail') + (e && e.message ? ' (' + e.message + ')' : ''));
+  }
+}
+// إعدادات الإدارة المشتركة من الخادم: أسعار الهدايا، الأفاتار الجاهزة، الإعلانات
+async function loadAppConfig() {
+  try {
+    const { data } = await sbClient.from('app_config').select('key,value');
+    const map = {};
+    (data || []).forEach((r) => { map[r.key] = r.value; });
+    if (map.gift_prices && typeof map.gift_prices === 'object') applyGiftPrices(map.gift_prices);
+    profile.setAvatarPool(Array.isArray(map.avatar_pool) ? map.avatar_pool : []);
+    setAdsRemote(map.ads && typeof map.ads === 'object' ? map.ads : {});
+  } catch (e) {}
+}
+function applyGiftPrices(prices) {
+  GIFTS.forEach((g) => { if (typeof prices[g.id] === 'number') g.p = prices[g.id]; });
+  document.querySelectorAll('[data-gp]').forEach((el) => {
+    const g = GIFTS.find((x) => x.id === el.dataset.gp);
+    if (!g) return;
+    if (g.p === 0) { el.dataset.i18n = 'gift.free'; el.textContent = t('gift.free'); }
+    else { delete el.dataset.i18n; el.textContent = '🪙 ' + g.p; }
+  });
+}
 async function saveMyAvatar(file) {
   try {
     const dataUrl = await readAvatarDataUrl(file);
@@ -13091,7 +13178,8 @@ async function publicStart() {
     dmStart();
     const { data } = await sbClient.from('messages').select('*').eq('room', PUBLIC_ROOM).order('created_at', { ascending: false }).limit(50);
     for (const r of (data || []).reverse()) await publicShow(r, !!pubMyId && r.user_id === pubMyId);
-    // آخر إعلان للدردشة العامة (غير المنتهي) يظهر في الشريط المتحرك
+    // الإعدادات المشتركة من الخادم ثم آخر إعلان للدردشة العامة (غير المنتهي)
+    await loadAppConfig();
     await loadTicker();
     // أحدث الرسائل تظهر أولاً عند الدخول: ننزل لآخر رسالة بعد التحميل وبعد تحميل الصور
     chat.scrollEnd();
@@ -13105,6 +13193,10 @@ async function publicStart() {
       publicShow(r, false);
       if (notifSoundOn()) playSound('message');
     })
+    .subscribe();
+  // تغييرات الإعدادات المشتركة (هدايا، أفاتار، إعلانات) تصل للجميع فوراً
+  sbClient.channel('app-config-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_config' }, () => loadAppConfig())
     .subscribe();
   // الإعلانات الإدارية: شريط متحرك أعلى الدردشة العامة
   sbClient.channel('announce-live')
